@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Files in and out of the page.** *Open* — and a file dropped on the editor —
+  reads a `.skiss` or `.txt` file as a sketch, and a `.yaml`, `.yml` or `.json`
+  LinkML schema through the package's `importLinkML`, with the line
+  `formatDropped` writes above the editor saying what a sketch was too small to
+  carry; a file of any other kind is refused by name. *Save .skiss* writes the
+  sketch out as `sketch.skiss`, or under the name of the file that was opened,
+  and *Save LinkML* the compiled schema as `sketch.linkml.yaml`, disabled while
+  the sketch has an error. LinkML pasted into the editor is offered an import
+  rather than given one: nothing is converted without the button. A file is read
+  in the browser and is never uploaded.
+
 - **A sketch you can send, copy and save.** *Share* compresses the sketch into
   the URL fragment as `#s=<base64url>` — `CompressionStream('deflate-raw')`, no
   library — copies the link and writes it into the address bar; opening one

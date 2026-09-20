@@ -14,6 +14,7 @@ Try [Skiss](https://github.com/erik-naslund/skiss) in the browser: write a sketc
 - **Four examples** in the header, to start from rather than an empty page.
 - **A link you can send.** *Share* puts the whole sketch in the link, copies it and writes it into the address bar. Whoever opens it sees what you saw.
 - **The sketch out of the page.** *Copy Mermaid* and *Copy LinkML* put the text the compiler generates on your clipboard; *Download SVG* and *Download PNG* save the diagram as a file. The PNG is transparent, at twice the size the diagram is drawn at, so it stands up where it is pasted.
+- **Your own files.** *Open* reads a `.skiss` or `.txt` file into the editor, and a `.yaml`, `.yml` or `.json` LinkML schema back into a sketch — the same projection `skiss import` does, with a line above the editor saying what a sketch is too small to carry. Drop a file on the editor instead, if that is quicker. *Save .skiss* writes the sketch out again, *Save LinkML* the compiled schema. A file is read by your own browser and goes nowhere.
 - **Your colours.** *Highlight colours* in the header offers the three the Obsidian plugin does: **Calm**, which colours what says what a thing is; **Vivid**, which colours the names and the marks between them too; and **Off**, which leaves the sketch as plain text and the diagnostics in the gutter. The choice is remembered between visits.
 - **Your draft, still there.** What you last wrote is kept in your browser and restored the next time you open the page — unless you opened a link, which wins.
 
@@ -31,6 +32,20 @@ Editor and diagram sit side by side on a wide screen and stack on a narrow one; 
 
 Everything else is CodeMirror's default keymap.
 
+### Files it opens and saves
+
+| | |
+| --- | --- |
+| *Open*, or a file dropped on the editor | `.skiss`, `.txt` — the text of the file becomes the sketch. `.yaml`, `.yml`, `.json` — a LinkML schema, projected into a sketch by the package's own `importLinkML`. Anything else is refused by name. |
+| *Save .skiss* | The sketch as it stands, as `sketch.skiss` — or under the name of the file you opened. |
+| *Save LinkML* | The compiled schema as `sketch.linkml.yaml`, the text `skiss compile` writes. Disabled while the sketch has an error, because half a schema is not a file anyone wants. |
+
+A sketch is a smaller language than LinkML, so a schema that carries more than it can — a `pattern`, a `required`, a `mixins` — comes in without them, and the line above the editor says exactly what was left behind, as `skiss import` says it on the command line. It stays until your next edit. The file itself is never touched: what you opened is still on your disk as it was.
+
+Paste a LinkML schema into the editor and the page offers to import it, with a button you press or ignore. Nothing you type or paste is ever converted on its own.
+
+A file you open is read in the page by the browser itself, and a file you save is written by the same `<a download>` the SVG and the PNG go through. Nothing is uploaded: there is no server to upload it to.
+
 ### What a share link holds
 
 The link is the sketch. *Share* compresses the text with the browser's own `CompressionStream('deflate-raw')`, encodes the bytes as base64url and puts them in the URL's fragment — the part after the `#` — as `#s=<base64url>`. The Star Wars example comes to a link of about 260 characters. Opening a link decodes it back into the editor, and a fragment that does not decode is ignored with a short notice rather than an empty page. What the link does not carry is your choice of highlight colours: a link carries the sketch, not a preference.
@@ -39,7 +54,7 @@ A fragment is the one part of a URL a browser never sends to the server, so a sk
 
 ## What it is
 
-A static page. There is no backend and no account. A sketch you type stays in your own browser — in the editor, in the draft `localStorage` keeps, and in the URL you choose to share — and goes nowhere else: no analytics, no cookies, nothing fetched from a third party ([ADR-0001](docs/adr/0001-static-site-on-github-pages.md)).
+A static page. There is no backend and no account. A sketch you type stays in your own browser — in the editor, in the draft `localStorage` keeps, and in the URL you choose to share — and goes nowhere else: no analytics, no cookies, nothing fetched from a third party ([ADR-0001](docs/adr/0001-static-site-on-github-pages.md)). A file you open never leaves your browser either: it is read in the page and nothing is sent anywhere.
 
 ## Running it locally
 
