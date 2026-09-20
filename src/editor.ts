@@ -12,6 +12,7 @@
 
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import {
+  Compartment,
   EditorSelection,
   EditorState,
   type Extension,
@@ -52,6 +53,11 @@ export interface Editor {
   /** Replaces the whole document, as choosing an example does. */
   setText(text: string): void;
   setDiagnostics(diagnostics: readonly LineDiagnostic[]): void;
+  /**
+   * Colours the sketch, or stops colouring it. *Off* in the header takes the
+   * extension out; the gutter and everything else stay where they are.
+   */
+  setHighlighting(on: boolean): void;
   focus(): void;
   destroy(): void;
 }
@@ -225,19 +231,36 @@ const escapeTabTrap: Command = (view) => {
   return false;
 };
 
-function extensions(onChange: (text: string) => void): Extension[] {
+/**
+ * The palette as an extension that can be swapped without rebuilding the
+ * editor, which is what *Off* does: a compartment is CodeMirror's own way of
+ * reconfiguring one part of a running editor, and it leaves the document, the
+ * history and the cursor where they are.
+ */
+const palette = new Compartment();
+
+function colouring(on: boolean): Extension {
+  return on ? highlighting : [];
+}
+
+function extensions(onChange: (text: string) => void, highlight: boolean): Extension[] {
   return [
     lineNumbers(),
     history(),
-    // Before the default keymap, which binds Tab to nothing and Escape to
-    // simplifying the selection.
+    // Before the default keymap, which binds Tab to nothing, Escape to
+    // simplifying the selection and Mod-Enter to a blank line.
     keymap.of([
       { key: 'Tab', run: insertIndent },
       { key: 'Escape', run: escapeTabTrap },
+      // Taken, and nothing done with it: the page listens for Mod-Enter on the
+      // window, so it forces a render from inside the editor as well as
+      // outside it, and this is what keeps CodeMirror from inserting a line
+      // under the cursor on the way there.
+      { key: 'Mod-Enter', run: () => true },
       ...defaultKeymap,
       ...historyKeymap,
     ]),
-    highlighting,
+    palette.of(colouring(highlight)),
     diagnosticsField,
     gutter({ class: 'skiss-gutter', markers: gutterMarkers }),
     // A sketch line with a description on it is long, and the pane is
@@ -254,11 +277,14 @@ function extensions(onChange: (text: string) => void): Extension[] {
 
 export function createEditor(
   parent: HTMLElement,
-  options: { doc: string; onChange: (text: string) => void },
+  options: { doc: string; onChange: (text: string) => void; highlighting: boolean },
 ): Editor {
   const view = new EditorView({
     parent,
-    state: EditorState.create({ doc: options.doc, extensions: extensions(options.onChange) }),
+    state: EditorState.create({
+      doc: options.doc,
+      extensions: extensions(options.onChange, options.highlighting),
+    }),
   });
 
   return {
@@ -271,6 +297,9 @@ export function createEditor(
     },
     setDiagnostics: (diagnostics) => {
       view.dispatch({ effects: setDiagnosticsEffect.of(diagnostics) });
+    },
+    setHighlighting: (on) => {
+      view.dispatch({ effects: palette.reconfigure(colouring(on)) });
     },
     focus: () => view.focus(),
     destroy: () => view.destroy(),

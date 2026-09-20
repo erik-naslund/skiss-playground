@@ -44,8 +44,10 @@ describe('the decoration builder', () => {
     for (const kind of Object.keys(KIND_LINES)) {
       if (kind === 'operator') {
         // `:`, `[]`, `|`, `<`, `~`, `=` and `@` take the colour of the text
-        // around them by design, so there is no rule to find.
-        expect(STYLESHEET).not.toContain(`.${CLASS_PREFIX}operator {`);
+        // around them by design, so the calm palette has no rule to find. The
+        // one *Vivid* adds is scoped to the body class, which is why what is
+        // looked for here is a rule at the start of a line.
+        expect(STYLESHEET).not.toContain(`\n.${CLASS_PREFIX}operator {`);
         continue;
       }
       const rule = new RegExp(`\\.${CLASS_PREFIX}${kind}[^{]*\\{[^}]*color: var\\((--[a-z-]+)\\)`);
