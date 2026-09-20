@@ -67,8 +67,14 @@ export function themeFor(dark: boolean): DiagramTheme {
 export interface Diagram {
   /** Draws `mermaidText`, a while after the last call. */
   draw(mermaidText: string): void;
-  /** Draws it now. The tests and the theme switch use this; typing uses `draw`. */
+  /** Draws it now. The tests, the theme switch and Mod-Enter use this; typing uses `draw`. */
   drawNow(mermaidText: string): Promise<void>;
+  /**
+   * The `<svg>` on screen, or `undefined` before the first one has drawn. What
+   * the downloads export: the picture the visitor is looking at, not another
+   * render of the same text.
+   */
+  svg(): Element | undefined;
   destroy(): void;
 }
 
@@ -92,6 +98,9 @@ export function createDiagram(content: HTMLElement, message: HTMLElement): Diagr
   let latest = 0;
   let destroyed = false;
   let theme = themeFor(prefersDark());
+  // The element `content` is showing, held so a download does not have to read
+  // it back out of the DOM.
+  let drawn: Element | undefined;
   // The last text the page asked for, which is what a change of colour scheme
   // draws again.
   let current = '';
@@ -106,6 +115,7 @@ export function createDiagram(content: HTMLElement, message: HTMLElement): Diagr
       }
       content.classList.remove('placeholder');
       content.replaceChildren(svg);
+      drawn = svg;
       message.hidden = true;
       message.textContent = '';
     } catch (error) {
@@ -146,6 +156,7 @@ export function createDiagram(content: HTMLElement, message: HTMLElement): Diagr
       cancel();
       await drawNow(mermaidText);
     },
+    svg: () => drawn,
     destroy: () => {
       destroyed = true;
       cancel();

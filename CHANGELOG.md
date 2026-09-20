@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A sketch you can send, copy and save.** *Share* compresses the sketch into
+  the URL fragment as `#s=<base64url>` — `CompressionStream('deflate-raw')`, no
+  library — copies the link and writes it into the address bar; opening one
+  decodes it back into the editor, over anything else, and a fragment that does
+  not decode is ignored with a notice. *Copy Mermaid* and *Copy LinkML* put
+  what `skiss diagram` and `skiss compile` write on the clipboard, and are
+  disabled while the sketch has an error. *Download SVG* saves the diagram as
+  it is drawn; *Download PNG* saves it transparent, at twice that size.
+  `Ctrl`/`Cmd` `S` copies the link and `Ctrl`/`Cmd` `Enter` draws the diagram
+  now. The fragment is the only place a sketch goes: nothing is uploaded.
+
+- **The draft, and the colours, between visits.** What is in the editor is kept
+  in `localStorage` and restored on the next visit, unless a link carries a
+  sketch, which wins; an example replaces it. *Highlight colours* in the header
+  offers the three the Obsidian plugin 0.4.0 does — *Calm*, *Vivid* and *Off* —
+  and is kept the same way. It is never in a share link: a link carries the
+  sketch, not a preference.
+
 - **An editor, and the diagram beside it.** CodeMirror 6 on the left, coloured
   by the tokenizer `@eriknaslund/skiss` 0.6.0 exports, with the compiler's
   diagnostics as bars in its gutter and as a list under it, errors first, and
