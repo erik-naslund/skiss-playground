@@ -13,6 +13,21 @@
   --field: #f6f6f3;
   --accent: #7a5c1e;
   --gutter: 16px;
+  --error: #a3402a;
+  --warning: #9a6b12;
+
+  /*
+   * The colours of a sketch. The Obsidian plugin reads the theme's own
+   * `--code-*` variables; there is no theme here, so the page carries its own
+   * set under the same names, and the palette below is written against them.
+   */
+  --code-normal: #1b1b1a;
+  --code-property: #2d5d8f;
+  --code-tag: #7a5c1e;
+  --code-keyword: #6b3fa0;
+  --code-value: #2f6f4f;
+  --code-important: #a3402a;
+  --code-comment: #73736a;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -24,6 +39,16 @@
     --panel: #1c1c21;
     --field: #121216;
     --accent: #d8b463;
+    --error: #e8977f;
+    --warning: #d8b463;
+
+    --code-normal: #e6e6e3;
+    --code-property: #8ab4e8;
+    --code-tag: #d8b463;
+    --code-keyword: #c3a0e8;
+    --code-value: #8fc9a4;
+    --code-important: #e8977f;
+    --code-comment: #9b9b95;
   }
 }
 
@@ -42,7 +67,7 @@ body {
 }
 
 #app {
-  max-width: 68rem;
+  max-width: 84rem;
   margin: 0 auto;
 }
 
@@ -73,25 +98,82 @@ h1 {
   color: var(--muted);
 }
 
+.chooser {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+}
+
+.chooser label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+select,
+button {
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: inherit;
+  font: inherit;
+  font-size: 0.875rem;
+}
+
+button {
+  cursor: pointer;
+}
+
+select:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 main {
   display: grid;
   gap: 1.25rem;
   padding-top: 1.25rem;
 }
 
-/* Side by side once there is room for two readable columns; stacked below
+/* Side by side once there is room for an editor and a diagram; stacked below
    that, which is what a phone gets. */
-@media (min-width: 52rem) {
+@media (min-width: 900px) {
   main {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: auto minmax(0, 1fr);
     align-items: start;
+  }
+
+  /* The reader decides how much of the width the sketch gets. `resize` rather
+     than a drag handle of our own: it is the browser's, it is keyboard and
+     touch accessible already, and it is one line. */
+  .editor-pane {
+    width: min(34rem, 45vw);
+    min-width: 18rem;
+    max-width: 70vw;
+    resize: horizontal;
+    overflow: hidden;
   }
 }
 
-.panel {
+.pane {
   display: grid;
   gap: 0.5rem;
+  /* A grid item is as wide as its content unless it is told otherwise, which
+     is what would push a wide diagram past the edge of the page. */
   min-width: 0;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
 }
 
 .heading {
@@ -103,39 +185,219 @@ main {
   color: var(--muted);
 }
 
-textarea,
-pre {
-  margin: 0;
-  padding: 0.75rem;
+/* The editor. CodeMirror brings no colours of its own that matter here: the
+   page gives it the field's background, the site's monospace and its line
+   height, and the palette below does the rest. */
+.cm-editor {
+  height: clamp(18rem, 52vh, 40rem);
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--field);
-  color: inherit;
+  color: var(--ink);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.875rem;
   line-height: 1.55;
-  tab-size: 4;
 }
 
-textarea {
-  width: 100%;
-  min-height: 22rem;
-  resize: vertical;
-}
-
-textarea:focus-visible {
+.cm-editor.cm-focused {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
 
-pre {
-  overflow-x: auto;
-  background: var(--panel);
-  white-space: pre-wrap;
+.cm-editor .cm-scroller {
+  font-family: inherit;
+  line-height: inherit;
+}
+
+.cm-editor .cm-content {
+  caret-color: var(--ink);
+}
+
+.cm-editor .cm-cursor {
+  border-left-color: var(--ink);
+}
+
+.cm-editor .cm-gutters {
+  border-right: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+}
+
+.cm-editor .cm-activeLine,
+.cm-editor .cm-activeLineGutter {
+  background: transparent;
+}
+
+.cm-editor .cm-selectionBackground,
+.cm-editor .cm-content ::selection {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+/*
+ * The lines of a sketch, coloured by what they are. This is the plugin's
+ * *calm* palette: a sketch is almost all names and marks with little neutral
+ * text to rest on, so what a reader has already read stays the colour of the
+ * text and only what says what a thing *is* carries one. Colour only: no
+ * weight, no size and no font, so a line is the same shape whatever it says.
+ */
+.cm-skiss-class {
+  color: var(--code-property);
+}
+
+/* The most frequent thing in a sketch, and the writer's own word: it reads as
+   text, which is what leaves the class name above it something to stand out
+   against. */
+.cm-skiss-field {
+  color: var(--code-normal);
+}
+
+.cm-skiss-system {
+  color: var(--code-tag);
+}
+
+.cm-skiss-primitive {
+  color: var(--code-keyword);
+}
+
+/* A lowercase word that is no primitive compiles to `string` with a warning.
+   It is the writer's own word, so it reads as one. */
+.cm-skiss-type {
+  color: var(--code-normal);
+}
+
+.cm-skiss-enum {
+  color: var(--code-value);
+}
+
+/* No rule for `.cm-skiss-operator`: `:`, `[]`, `|`, `<`, `~`, `=` and `@` take
+   the colour of the text around them, so a field line is not three colours
+   long. `Jedi < Character` is two class names with a plain mark between them. */
+
+/* The `*` that marks the identifier: the one mark that changes what a class is. */
+.cm-skiss-marker {
+  color: var(--code-important);
+}
+
+.cm-skiss-comment,
+.cm-skiss-description {
+  color: var(--code-comment);
+}
+
+/* A doubt is the point of the sketch, so it is the one trailer not muted, as
+   it is in the list below the editor. */
+.cm-skiss-doubt {
+  color: var(--code-normal);
+}
+
+/* The diagnostics gutter: a bar rather than a glyph, because it is the same
+   size in every browser, and the message it stands for is on its tooltip. */
+.cm-editor .cm-gutter.skiss-gutter {
+  padding: 0;
+}
+
+.skiss-gutter-marker {
+  display: block;
+  width: 3px;
+  height: 100%;
+  margin: 0 3px;
+  border-radius: 2px;
+}
+
+.skiss-gutter-error {
+  background-color: var(--error);
+}
+
+.skiss-gutter-warning {
+  background-color: var(--warning);
+}
+
+/* What the compiler found, and what the sketch is still asking. Both are
+   hidden outright when there is nothing in them, which `:not([hidden])` is
+   what keeps true: a `display` of our own would otherwise beat the one the
+   browser gives a hidden element. */
+.diagnostics-panel:not([hidden]),
+.questions-panel:not([hidden]) {
+  display: grid;
+  gap: 0.35rem;
+}
+
+#diagnostics,
+#questions {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8125rem;
+}
+
+#diagnostics li,
+#questions li {
+  padding: 0.15rem 0 0.15rem 0.7rem;
+  border-left: 3px solid transparent;
   overflow-wrap: anywhere;
 }
 
-/* Nothing to report reads as an absence, not as output. */
-pre.quiet {
+#diagnostics li.error {
+  border-left-color: var(--error);
+}
+
+#diagnostics li.warning {
+  border-left-color: var(--warning);
   color: var(--muted);
+}
+
+/* A question is the point of the sketch, so it is not muted either. */
+#questions li {
+  border-left-color: var(--line);
+}
+
+/* The diagram. The viewport clips and the content inside it is what pans and
+   zooms, so the pane keeps its size whatever the diagram does. */
+#viewport {
+  position: relative;
+  height: clamp(18rem, 52vh, 40rem);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  overflow: hidden;
+  cursor: grab;
+  /* The browser's own panning and zooming would fight the pane's, and a drag
+     across the diagram would otherwise select the words in it. */
+  touch-action: none;
+  user-select: none;
+}
+
+#viewport.dragging {
+  cursor: grabbing;
+}
+
+#diagram {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 0.75rem;
+  transform-origin: 0 0;
+}
+
+/* Mermaid writes an inline pixel `max-width` on the SVG it hands back, so a
+   wide diagram would overflow the pane instead of fitting it. */
+#diagram svg {
+  max-width: 100%;
+  max-height: 100%;
+  height: auto;
+}
+
+/* Before the first diagram is drawn, and while a sketch has nothing to draw. */
+#diagram.placeholder {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+#diagram-message {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--error);
+  overflow-wrap: anywhere;
 }
