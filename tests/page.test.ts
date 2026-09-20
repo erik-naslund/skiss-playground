@@ -4,6 +4,7 @@ import { VERSION } from '@eriknaslund/skiss';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { EXAMPLES } from '../src/examples';
 import { linkmlText, mermaidText } from '../src/exports';
+import { ACCEPT, importSketch } from '../src/files';
 import { mount, type Page } from '../src/page';
 import { VIVID_BODY_CLASS } from '../src/palette';
 import { decodeSketch, encodeSketch } from '../src/share';
@@ -38,7 +39,7 @@ function query<E extends Element>(root: ParentNode, selector: string): E {
  * on the real `URL` rather than over it: the constructor is still needed while
  * they are there. The call gives back what puts the object as it was.
  */
-function objectUrls(create: () => string): () => void {
+function objectUrls(create: (blob: Blob) => string): () => void {
   const had = Object.getOwnPropertyDescriptor(URL, 'createObjectURL');
   const hadRevoke = Object.getOwnPropertyDescriptor(URL, 'revokeObjectURL');
   Object.defineProperty(URL, 'createObjectURL', { value: create, configurable: true });
@@ -456,5 +457,304 @@ describe('the highlight colours in the header', () => {
     // The link holds the sketch and only the sketch.
     expect(new URL(url).hash).toBe(`#s=${await encodeSketch(sketch)}`);
     expect(url).not.toContain('vivid');
+  });
+});
+
+/**
+ * Opening a file, dropping one on the editor, saving the sketch and the schema,
+ * and the offer a pasted schema gets. jsdom has neither `DragEvent` nor
+ * `DataTransfer`, so a drop is the event the page listens for with the one
+ * property it reads put on it — which is all the page ever touches.
+ */
+describe('opening and saving files', () => {
+  let root: HTMLElement;
+  let page: Page | undefined;
+  let restoreUrls: (() => void) | undefined;
+  let downloads: { name: string; blob: Blob | undefined }[];
+  let lastBlob: Blob | undefined;
+  let onClick: ((event: Event) => void) | undefined;
+
+  const SKETCH = 'Droid @Catalog\n    serial*\n    model\n';
+
+  beforeEach(() => {
+    localStorage.clear();
+    window.location.hash = '';
+    downloads = [];
+    lastBlob = undefined;
+    root = document.createElement('div');
+    document.body.append(root);
+    restoreUrls = objectUrls((blob) => {
+      lastBlob = blob;
+      return 'blob:sketch';
+    });
+    // The anchor a download goes through is clicked, not navigated to; the blob
+    // it was given is the file the visitor would have got.
+    onClick = (event: Event): void => {
+      if (event.target instanceof HTMLAnchorElement) {
+        downloads.push({ name: event.target.download, blob: lastBlob });
+        event.preventDefault();
+      }
+    };
+    document.addEventListener('click', onClick, true);
+  });
+
+  afterEach(() => {
+    if (onClick !== undefined) {
+      document.removeEventListener('click', onClick, true);
+      onClick = undefined;
+    }
+    page?.destroy();
+    page = undefined;
+    root.remove();
+    restoreUrls?.();
+    restoreUrls = undefined;
+  });
+
+  function open(): Page {
+    page = mount(root);
+    return page;
+  }
+
+  /** A file the visitor chose, as the hidden input reports one. */
+  function choose(file: File): void {
+    const input = query<HTMLInputElement>(root, '#file');
+    Object.defineProperty(input, 'files', { value: [file], configurable: true });
+    input.dispatchEvent(new Event('change'));
+  }
+
+  /** The same file, dropped on the editor pane instead. */
+  function drop(file: File | undefined): Event {
+    const event = new Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'dataTransfer', {
+      value: { files: file === undefined ? [] : [file], types: ['Files'] },
+    });
+    query(root, '.editor-pane').dispatchEvent(event);
+    return event;
+  }
+
+  function file(name: string, text: string): File {
+    return new File([text], name, { type: 'text/plain' });
+  }
+
+  /** The sentence and the report above the editor. */
+  function saidAboutFiles(): string {
+    return query(root, '.file-panel').textContent ?? '';
+  }
+
+  function editorText(): string {
+    return query(root, '.cm-content').textContent ?? '';
+  }
+
+  it('offers an Open button and a file input for the extensions it reads', () => {
+    open();
+
+    expect(query<HTMLButtonElement>(root, '#open').type).toBe('button');
+    const input = query<HTMLInputElement>(root, '#file');
+    expect(input.type).toBe('file');
+    expect(input.accept).toBe(ACCEPT);
+    expect(input.hidden).toBe(true);
+  });
+
+  it('shows an opened .skiss file in the editor and renders it', async () => {
+    open();
+
+    choose(file('booking.skiss', SKETCH));
+
+    await vi.waitFor(() => expect(editorText()).toContain('Droid'));
+    expect(query(root, '#notice').textContent).toContain('booking.skiss');
+    await vi.waitFor(() => {
+      expect(query(root, '#diagram svg').textContent).toContain('class Droid');
+    });
+  });
+
+  it('imports an opened LinkML file, shows the dropped report and renders the sketch', async () => {
+    const schema = `id: https://example.org/people
+name: people
+default_prefix: people
+default_range: string
+prefixes: {}
+imports:
+  - linkml:types
+classes:
+  Person:
+    mixins:
+      - Auditable
+    attributes:
+      id:
+        identifier: true
+      name:
+        pattern: "^[A-Z]"
+`;
+    open();
+
+    choose(file('people.yaml', schema));
+
+    await vi.waitFor(() => expect(editorText()).toContain('Person'));
+    expect(query<HTMLElement>(root, '.file-panel').hidden).toBe(false);
+    // The package's own report, line for line.
+    expect(texts(root, '#file-report li')).toEqual(importSketch(schema).report);
+    expect(saidAboutFiles()).toContain('pattern');
+    await vi.waitFor(() => {
+      expect(query(root, '#diagram svg').textContent).toContain('class Person');
+    });
+  });
+
+  it('keeps the sketch and says why for a LinkML file no schema can be read out of', async () => {
+    open().setSketch(SKETCH);
+
+    choose(file('people.yaml', '- one\n- two\n'));
+
+    await vi.waitFor(() => expect(query<HTMLElement>(root, '.file-panel').hidden).toBe(false));
+    expect(editorText()).toContain('Droid');
+    expect(saidAboutFiles().length).toBeGreaterThan(0);
+  });
+
+  it('takes the report away again on the next edit', async () => {
+    open();
+    choose(file('people.yaml', 'id: x\nname: x\nclasses:\n  Person:\n    mixins:\n      - A\n'));
+    await vi.waitFor(() => expect(query<HTMLElement>(root, '.file-panel').hidden).toBe(false));
+
+    page?.setSketch('Ship @Fleet\n    id*\n');
+
+    expect(query<HTMLElement>(root, '.file-panel').hidden).toBe(true);
+  });
+
+  it('opens a file dropped on the editor pane', async () => {
+    open();
+
+    const event = drop(file('booking.skiss', SKETCH));
+
+    expect(event.defaultPrevented).toBe(true);
+    await vi.waitFor(() => expect(editorText()).toContain('Droid'));
+  });
+
+  it('refuses a dropped .png with a notice naming the extensions it reads', async () => {
+    open().setSketch(SKETCH);
+
+    drop(new File(['not text at all'], 'diagram.png', { type: 'image/png' }));
+
+    await vi.waitFor(() => expect(query<HTMLElement>(root, '.file-panel').hidden).toBe(false));
+    for (const extension of ACCEPT.split(',')) {
+      expect(saidAboutFiles()).toContain(extension);
+    }
+    // And the sketch that was there is still there.
+    expect(editorText()).toContain('Droid');
+  });
+
+  it('leaves a drop that carries no file to the editor', () => {
+    open();
+
+    const event = drop(undefined);
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(query<HTMLElement>(root, '.file-panel').hidden).toBe(true);
+  });
+
+  it('saves the editor text as sketch.skiss, and under the opened name once one is opened', async () => {
+    open().setSketch(SKETCH);
+
+    query<HTMLButtonElement>(root, '#save-skiss').click();
+
+    await vi.waitFor(() => expect(downloads.length).toBe(1));
+    expect(downloads[0]?.name).toBe('sketch.skiss');
+    expect(await downloads[0]?.blob?.text()).toBe(SKETCH);
+
+    // A file of its own text, so the wait is for the file and not for what was
+    // already in the editor.
+    const opened = 'Ship @Fleet\n    id*\n';
+    choose(file('booking.skiss', opened));
+    await vi.waitFor(() => expect(editorText()).toContain('Ship'));
+    query<HTMLButtonElement>(root, '#save-skiss').click();
+
+    await vi.waitFor(() => expect(downloads.length).toBe(2));
+    expect(downloads[1]?.name).toBe('booking.skiss');
+    expect(await downloads[1]?.blob?.text()).toBe(opened);
+  });
+
+  it('saves the compiled schema as sketch.linkml.yaml', async () => {
+    open().setSketch(SKETCH);
+
+    query<HTMLButtonElement>(root, '#save-linkml').click();
+
+    await vi.waitFor(() => expect(downloads.length).toBe(1));
+    expect(downloads[0]?.name).toBe('sketch.linkml.yaml');
+    expect(await downloads[0]?.blob?.text()).toBe(linkmlText(SKETCH));
+  });
+
+  it('names the schema after the file the sketch was opened from', async () => {
+    open();
+    choose(file('booking.skiss', 'Ship @Fleet\n    id*\n'));
+    await vi.waitFor(() => expect(editorText()).toContain('Ship'));
+
+    query<HTMLButtonElement>(root, '#save-linkml').click();
+
+    await vi.waitFor(() => expect(downloads.length).toBe(1));
+    expect(downloads[0]?.name).toBe('booking.linkml.yaml');
+  });
+
+  it('goes back to sketch.skiss when an example replaces the opened file', async () => {
+    open();
+    choose(file('booking.skiss', 'Ship @Fleet\n    id*\n'));
+    await vi.waitFor(() => expect(editorText()).toContain('Ship'));
+
+    const select = query<HTMLSelectElement>(root, '#example');
+    select.value = EXAMPLES[1]?.id ?? '';
+    select.dispatchEvent(new Event('change'));
+    query<HTMLButtonElement>(root, '#save-skiss').click();
+
+    await vi.waitFor(() => expect(downloads.length).toBe(1));
+    expect(downloads[0]?.name).toBe('sketch.skiss');
+  });
+
+  it('disables Save LinkML while the sketch has an error, and keeps Save .skiss', () => {
+    open().setSketch('Character\n  homeworld: Planet\n  ???\n');
+
+    const linkml = query<HTMLButtonElement>(root, '#save-linkml');
+    expect(linkml.disabled).toBe(true);
+    expect(linkml.title).not.toBe('');
+    // The sketch itself is the visitor's text, error or no error.
+    expect(query<HTMLButtonElement>(root, '#save-skiss').disabled).toBe(false);
+
+    page?.setSketch('Character\n    name\n');
+    expect(query<HTMLButtonElement>(root, '#save-linkml').disabled).toBe(false);
+    expect(query<HTMLButtonElement>(root, '#save-linkml').hasAttribute('title')).toBe(false);
+  });
+
+  it('offers to import pasted LinkML, and converts nothing until the button is pressed', () => {
+    const schema = `id: https://example.org/people
+name: people
+default_prefix: people
+default_range: string
+prefixes: {}
+imports: []
+classes:
+  Person:
+    attributes:
+      id:
+        identifier: true
+      name: {}
+`;
+    open().setSketch(schema);
+
+    // The offer, and the schema still in the editor: nothing was converted.
+    expect(query<HTMLElement>(root, '.file-panel').hidden).toBe(false);
+    expect(saidAboutFiles()).toContain('LinkML');
+    expect(query<HTMLButtonElement>(root, '#import-linkml').hidden).toBe(false);
+    expect(editorText()).toContain('classes:');
+
+    query<HTMLButtonElement>(root, '#import-linkml').click();
+
+    expect(editorText()).toContain('Person');
+    expect(editorText()).not.toContain('classes:');
+    expect(query<HTMLButtonElement>(root, '#import-linkml').hidden).toBe(true);
+  });
+
+  it('offers nothing for a sketch, and nothing for text that only mentions classes', () => {
+    open().setSketch(SKETCH);
+    expect(query<HTMLElement>(root, '.file-panel').hidden).toBe(true);
+
+    page?.setSketch('Classes @Timetable\n    id*\n');
+    expect(query<HTMLElement>(root, '.file-panel').hidden).toBe(true);
+    expect(root.querySelector('#import-linkml')?.parentElement?.hidden).toBe(true);
   });
 });

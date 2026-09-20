@@ -367,6 +367,53 @@ body.skiss-vivid .cm-skiss-operator {
   background-color: var(--warning);
 }
 
+/* What a file brought with it, above the editor: the sentence of what
+   happened, what the projection into a sketch could not carry, and the button
+   of an offer. Hidden outright when there is nothing to say, which
+   `:not([hidden])` is what keeps true. */
+.file-panel:not([hidden]) {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  background: var(--panel);
+}
+
+#file-message {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+#file-report {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+#file-report li {
+  padding: 0.1rem 0;
+  overflow-wrap: anywhere;
+}
+
+/* The offer's button, under its sentence rather than beside it: it is a
+   decision the visitor makes, not another item in the toolbar. */
+#import-linkml {
+  justify-self: start;
+}
+
+/* The pane with a file over it. The editor's own border is what moves, because
+   the editor is what the drop replaces. */
+.editor-pane.dropping .cm-editor {
+  border-color: var(--accent);
+  outline: 2px dashed var(--accent);
+  outline-offset: 2px;
+}
+
 /* What the compiler found, and what the sketch is still asking. Both are
    hidden outright when there is nothing in them, which `:not([hidden])` is
    what keeps true: a `display` of our own would otherwise beat the one the
