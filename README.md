@@ -4,9 +4,28 @@ Try [Skiss](https://github.com/erik-naslund/skiss) in the browser: write a sketc
 
 **<https://erik-naslund.github.io/skiss-playground/>**
 
-> **Work in progress.** What is deployed today is the shell: it runs the `@eriknaslund/skiss` package in the browser and shows the Mermaid it generates as text, with the compiler's diagnostics under it. The editor and the rendered diagram come next, and the share links after that.
+> **Work in progress.** The editor and the diagram are there; share links, copy and download are not yet.
 
 *Skiss* is a text notation for sketching data models, compiled to LinkML. This repository is the playground only; the language and the compiler live in [erik-naslund/skiss](https://github.com/erik-naslund/skiss).
+
+## What the page does
+
+- **An editor on the left.** CodeMirror 6, with the sketch coloured as you write it: class names, `@` systems, primitives and enum values carry a colour, and everything you wrote yourself — field names, the words after `#`, the types the compiler does not know — reads as text. Light and dark follow your own setting.
+- **The diagram on the right.** Mermaid draws it in your browser, a moment after you stop typing. A half-typed line never blanks it: the last diagram that drew stays until the next one does. Drag to pan, wheel or pinch to zoom, **Fit** to go back.
+- **The compiler's diagnostics where you are looking.** A red or yellow bar in the gutter beside every line that has one — the message is on the bar's tooltip — and the same diagnostics as a list under the editor, errors first. The `?` doubts of the sketch are listed under *Open questions*.
+- **Four examples** in the header, to start from rather than an empty page.
+
+Editor and diagram sit side by side on a wide screen and stack on a narrow one; the divider between them is the editor's own right edge, which you can drag.
+
+### Keyboard
+
+| | |
+| --- | --- |
+| `Tab` | Four spaces, which is how a field is indented under its class. |
+| `Esc` then `Tab` | Leaves the editor, rather than indenting: `Esc` hands the next `Tab` back to the browser for a few seconds. |
+| `Ctrl`/`Cmd` `Z`, `Shift` `Ctrl`/`Cmd` `Z` | Undo and redo. |
+
+Everything else is CodeMirror's default keymap.
 
 ## What it is
 
