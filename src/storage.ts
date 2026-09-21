@@ -8,13 +8,14 @@
  * the quota is full, or be told by its owner to block it, and none of that is
  * a reason for the page to stop working: it just forgets between visits.
  *
- * The palette is stored and the draft is stored; the share link is neither.
- * A link carries the sketch, not a preference.
+ * The palette is stored and the draft — its text and its title — is stored;
+ * the share link is neither. A link carries the sketch, not a preference.
  */
 
 import { DEFAULT_HIGHLIGHT, type HighlightColours, isHighlightColours } from './palette';
 
 const DRAFT_KEY = 'skiss-playground:draft';
+const DRAFT_TITLE_KEY = 'skiss-playground:draft-title';
 const HIGHLIGHT_KEY = 'skiss-playground:highlight';
 
 /** How long after the last keystroke the draft is written. */
@@ -40,6 +41,21 @@ export function readDraft(storage: Storage | undefined): string | undefined {
 
 export function saveDraft(storage: Storage | undefined, text: string): void {
   write(storage, DRAFT_KEY, text);
+}
+
+/**
+ * The title of that draft, or `''` where there is none — which is every draft
+ * written before the title existed, and every sketch left untitled. A key of
+ * its own rather than a record under the draft's: a draft from an older visit
+ * is still a draft, and is restored rather than thrown away for being the
+ * wrong shape.
+ */
+export function readDraftTitle(storage: Storage | undefined): string {
+  return read(storage, DRAFT_TITLE_KEY) ?? '';
+}
+
+export function saveDraftTitle(storage: Storage | undefined, title: string): void {
+  write(storage, DRAFT_TITLE_KEY, title);
 }
 
 /**

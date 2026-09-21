@@ -7,7 +7,8 @@ import { linkmlText, mermaidText } from '../src/exports';
 import { ACCEPT, importSketch } from '../src/files';
 import { mount, type Page } from '../src/page';
 import { VIVID_BODY_CLASS } from '../src/palette';
-import { decodeSketch, encodeSketch } from '../src/share';
+import { decodeSketch, encodedFromHash, encodeSketch } from '../src/share';
+import { slugOf } from '../src/title';
 
 /**
  * Mermaid itself is not what these tests are about, and it wants a browser
@@ -62,6 +63,28 @@ function texts(root: ParentNode, selector: string): string[] {
   return [...root.querySelectorAll(selector)].map((element) => element.textContent ?? '');
 }
 
+/** The title as the visitor types it into the header. */
+function typeTitle(root: ParentNode, title: string): void {
+  const field = query<HTMLInputElement>(root, '#title');
+  field.value = title;
+  field.dispatchEvent(new Event('input'));
+}
+
+function titleOf(root: ParentNode): string {
+  return query<HTMLInputElement>(root, '#title').value;
+}
+
+function chosenExample(root: ParentNode): string {
+  return query<HTMLSelectElement>(root, '#example').value;
+}
+
+/** The example the header's select loads, as a visitor choosing one. */
+function chooseExample(root: ParentNode, id: string): void {
+  const select = query<HTMLSelectElement>(root, '#example');
+  select.value = id;
+  select.dispatchEvent(new Event('change'));
+}
+
 describe('the page', () => {
   let root: HTMLElement;
   let page: Page;
@@ -72,7 +95,9 @@ describe('the page', () => {
     window.location.hash = '';
     root = document.createElement('div');
     document.body.append(root);
-    page = mount(root);
+    // jsdom has no dialog, and a real one would ask a human: the page's
+    // confirmation is answered here, and yes is what nothing here is about.
+    page = mount(root, { confirm: () => true });
   });
 
   afterEach(() => {
@@ -85,11 +110,17 @@ describe('the page', () => {
     expect(query(root, '.version').textContent).toContain(VERSION);
   });
 
-  it('offers the four examples and opens on the first', () => {
+  it('offers the four examples under a blank option, and opens on the first', () => {
     const select = query<HTMLSelectElement>(root, '#example');
 
-    expect(texts(select, 'option')).toEqual(EXAMPLES.map((example) => example.name));
+    expect(texts(select, 'option')).toEqual([
+      'Load an example…',
+      ...EXAMPLES.map((example) => example.name),
+    ]);
+    // A fresh visit with no draft and no link still opens on the first
+    // example, and the select says which one it is.
     expect(select.value).toBe(EXAMPLES[0]?.id);
+    expect(titleOf(root)).toBe(EXAMPLES[0]?.name);
     expect(query(root, '.cm-content').textContent).toContain('Character');
   });
 
@@ -177,14 +208,14 @@ describe('the page', () => {
     expect(root.querySelector('#diagram')).not.toBeNull();
   });
 
-  it('replaces the sketch when another example is chosen', () => {
-    const select = query<HTMLSelectElement>(root, '#example');
+  it('replaces the sketch and its title when another example is chosen', () => {
     const library = EXAMPLES[1];
 
-    select.value = library?.id ?? '';
-    select.dispatchEvent(new Event('change'));
+    chooseExample(root, library?.id ?? '');
 
     expect(query(root, '.cm-content').textContent).toContain('Book');
+    expect(titleOf(root)).toBe(library?.name);
+    expect(chosenExample(root)).toBe(library?.id);
   });
 });
 
@@ -218,7 +249,7 @@ describe('sharing, copying and downloading', () => {
   });
 
   function open(): Page {
-    page = mount(root);
+    page = mount(root, { confirm: () => true });
     return page;
   }
 
@@ -238,30 +269,61 @@ describe('sharing, copying and downloading', () => {
     await vi.waitFor(() => expect(query(root, '#notice').textContent).not.toBe(''));
   }
 
-  it('restores the draft of the last visit when the link carries no sketch', () => {
+  it('restores the title and the text of the draft when the link carries no sketch', () => {
+    localStorage.setItem('skiss-playground:draft', 'Ship @Fleet\n    id*\n');
+    localStorage.setItem('skiss-playground:draft-title', 'Fleet');
+
+    open();
+
+    expect(query(root, '.cm-content').textContent).toContain('Ship');
+    expect(titleOf(root)).toBe('Fleet');
+    expect(document.title).toBe('Fleet · Skiss playground');
+    // A draft is the visitor's own sketch, not an example.
+    expect(chosenExample(root)).toBe('');
+  });
+
+  it('restores a draft written before the title existed, with no title', () => {
     localStorage.setItem('skiss-playground:draft', 'Ship @Fleet\n    id*\n');
 
     open();
 
     expect(query(root, '.cm-content').textContent).toContain('Ship');
+    expect(titleOf(root)).toBe('');
+    expect(document.title).toBe('Skiss playground');
   });
 
-  it('keeps the draft as the sketch is edited', async () => {
+  it('keeps the draft, and the title, as the sketch is edited', async () => {
     open().setSketch('Planet @Catalog\n    id*\n');
+    typeTitle(root, 'Planets');
 
     await vi.waitFor(() => {
       expect(localStorage.getItem('skiss-playground:draft')).toContain('Planet @Catalog');
+      expect(localStorage.getItem('skiss-playground:draft-title')).toBe('Planets');
     });
   });
 
-  it('opens the sketch a link carries, over the draft of the last visit', async () => {
+  it('opens the sketch and the title a link carries, over the draft of the last visit', async () => {
     localStorage.setItem('skiss-playground:draft', 'Ship @Fleet\n    id*\n');
-    window.location.hash = `#s=${await encodeSketch('Droid @Catalog\n    serial*\n')}`;
+    localStorage.setItem('skiss-playground:draft-title', 'Fleet');
+    const encoded = await encodeSketch('Droid @Catalog\n    serial*\n');
+    window.location.hash = `#s=${encoded}&t=${encodeURIComponent('Droid catalogue')}`;
 
     await open().ready;
 
     expect(query(root, '.cm-content').textContent).toContain('Droid');
     expect(query(root, '.cm-content').textContent).not.toContain('Ship');
+    expect(titleOf(root)).toBe('Droid catalogue');
+    expect(document.title).toBe('Droid catalogue · Skiss playground');
+  });
+
+  it('opens a link written before the title existed with an empty title', async () => {
+    window.location.hash = `#s=${await encodeSketch('Droid @Catalog\n    serial*\n')}`;
+
+    await open().ready;
+
+    expect(query(root, '.cm-content').textContent).toContain('Droid');
+    expect(titleOf(root)).toBe('');
+    expect(document.title).toBe('Skiss playground');
   });
 
   it('ignores a link that carries no sketch it can read, and says so', async () => {
@@ -274,24 +336,26 @@ describe('sharing, copying and downloading', () => {
     expect(query(root, '.cm-content').textContent).toContain('Character');
   });
 
-  it('copies a link that opens the same sketch, and puts it in the address bar', async () => {
+  it('copies a link that opens the same sketch and title, and puts it in the address bar', async () => {
     open().setSketch('Droid @Catalog\n    serial*\n');
+    typeTitle(root, 'Droid catalogue');
 
     await press('#share');
 
     expect(query(root, '#notice').textContent).toBe('Link copied');
-    expect(await decodeSketch(copied().split('#s=')[1] ?? '')).toBe(
-      'Droid @Catalog\n    serial*\n',
-    );
+    const hash = new URL(copied()).hash;
+    expect(await decodeSketch(encodedFromHash(hash) ?? '')).toBe('Droid @Catalog\n    serial*\n');
+    expect(hash).toContain(`&t=${encodeURIComponent('Droid catalogue')}`);
     // The same link is in the address bar, for a visitor who copies it there.
     expect(window.location.hash.startsWith('#s=')).toBe(true);
     expect(copied()).toBe(window.location.href);
   });
 
-  it('copies the Mermaid and the LinkML of the sketch on screen', async () => {
+  it('copies the Mermaid and the LinkML of the sketch on screen, named after the title', async () => {
     const sketch =
       'Character @Catalog\n    id*\n    homeworld: Planet\n\nPlanet @Catalog\n    id*\n';
     open().setSketch(sketch);
+    typeTitle(root, 'Booking flow');
 
     await press('#copy-mermaid');
     expect(query(root, '#notice').textContent).toBe('Mermaid copied');
@@ -299,6 +363,11 @@ describe('sharing, copying and downloading', () => {
 
     await press('#copy-linkml');
     expect(query(root, '#notice').textContent).toBe('LinkML copied');
+    // The schema is named after the title here as it is in the saved file.
+    expect(copied()).toBe(linkmlText(sketch, 'booking-flow'));
+
+    typeTitle(root, '');
+    await press('#copy-linkml');
     expect(copied()).toBe(linkmlText(sketch));
   });
 
@@ -316,7 +385,7 @@ describe('sharing, copying and downloading', () => {
     expect(query<HTMLButtonElement>(root, '#copy-linkml').hasAttribute('title')).toBe(false);
   });
 
-  it('downloads the diagram as sketch.svg', async () => {
+  it('names the diagram after the title: the first example downloads as its own slug', async () => {
     restoreUrls = objectUrls(() => 'blob:sketch');
     const downloaded: string[] = [];
     // The anchor the download goes through is clicked, not navigated to:
@@ -333,7 +402,10 @@ describe('sharing, copying and downloading', () => {
       await vi.waitFor(() => expect(root.querySelector('#diagram svg')).not.toBeNull());
       query<HTMLButtonElement>(root, '#download-svg').click();
 
-      await vi.waitFor(() => expect(downloaded).toEqual(['sketch.svg']));
+      await vi.waitFor(() =>
+        expect(downloaded).toEqual([`${slugOf(EXAMPLES[0]?.name ?? '')}.svg`]),
+      );
+      expect(downloaded[0]).toBe('star-wars-catalogue.svg');
     } finally {
       document.removeEventListener('click', onClick, true);
     }
@@ -448,6 +520,7 @@ describe('the highlight colours in the header', () => {
     const sketch = 'Droid @Catalog\n    serial*\n';
     page = mount(root);
     choose('vivid');
+    typeTitle(root, '');
     page.setSketch(sketch);
 
     query<HTMLButtonElement>(root, '#share').click();
@@ -473,6 +546,8 @@ describe('opening and saving files', () => {
   let downloads: { name: string; blob: Blob | undefined }[];
   let lastBlob: Blob | undefined;
   let onClick: ((event: Event) => void) | undefined;
+  /** What the page's confirmation is answered with where a file replaces a dirty sketch. */
+  let answer: boolean;
 
   const SKETCH = 'Droid @Catalog\n    serial*\n    model\n';
 
@@ -481,6 +556,7 @@ describe('opening and saving files', () => {
     window.location.hash = '';
     downloads = [];
     lastBlob = undefined;
+    answer = true;
     root = document.createElement('div');
     document.body.append(root);
     restoreUrls = objectUrls((blob) => {
@@ -511,7 +587,7 @@ describe('opening and saving files', () => {
   });
 
   function open(): Page {
-    page = mount(root);
+    page = mount(root, { confirm: () => answer });
     return page;
   }
 
@@ -555,13 +631,15 @@ describe('opening and saving files', () => {
     expect(input.hidden).toBe(true);
   });
 
-  it('shows an opened .skiss file in the editor and renders it', async () => {
+  it('shows an opened .skiss file in the editor, names it after the file and renders it', async () => {
     open();
 
-    choose(file('booking.skiss', SKETCH));
+    choose(file('Booking flow.skiss', SKETCH));
 
     await vi.waitFor(() => expect(editorText()).toContain('Droid'));
-    expect(query(root, '#notice').textContent).toContain('booking.skiss');
+    expect(titleOf(root)).toBe('Booking flow');
+    expect(document.title).toBe('Booking flow · Skiss playground');
+    expect(query(root, '#notice').textContent).toContain('Booking flow.skiss');
     await vi.waitFor(() => {
       expect(query(root, '#diagram svg').textContent).toContain('class Droid');
     });
@@ -650,29 +728,36 @@ classes:
     expect(query<HTMLElement>(root, '.file-panel').hidden).toBe(true);
   });
 
-  it('saves the editor text as sketch.skiss, and under the opened name once one is opened', async () => {
+  it('saves the editor text as sketch.skiss while the sketch has no title', async () => {
     open().setSketch(SKETCH);
+    typeTitle(root, '');
 
     query<HTMLButtonElement>(root, '#save-skiss').click();
 
     await vi.waitFor(() => expect(downloads.length).toBe(1));
     expect(downloads[0]?.name).toBe('sketch.skiss');
     expect(await downloads[0]?.blob?.text()).toBe(SKETCH);
+  });
+
+  it('opens Booking flow.skiss and saves it again as booking-flow.skiss', async () => {
+    open();
 
     // A file of its own text, so the wait is for the file and not for what was
     // already in the editor.
     const opened = 'Ship @Fleet\n    id*\n';
-    choose(file('booking.skiss', opened));
+    choose(file('Booking flow.skiss', opened));
     await vi.waitFor(() => expect(editorText()).toContain('Ship'));
+    expect(titleOf(root)).toBe('Booking flow');
     query<HTMLButtonElement>(root, '#save-skiss').click();
 
-    await vi.waitFor(() => expect(downloads.length).toBe(2));
-    expect(downloads[1]?.name).toBe('booking.skiss');
-    expect(await downloads[1]?.blob?.text()).toBe(opened);
+    await vi.waitFor(() => expect(downloads.length).toBe(1));
+    expect(downloads[0]?.name).toBe('booking-flow.skiss');
+    expect(await downloads[0]?.blob?.text()).toBe(opened);
   });
 
-  it('saves the compiled schema as sketch.linkml.yaml', async () => {
+  it('saves the compiled schema as sketch.linkml.yaml while the sketch has no title', async () => {
     open().setSketch(SKETCH);
+    typeTitle(root, '');
 
     query<HTMLButtonElement>(root, '#save-linkml').click();
 
@@ -681,29 +766,86 @@ classes:
     expect(await downloads[0]?.blob?.text()).toBe(linkmlText(SKETCH));
   });
 
-  it('names the schema after the file the sketch was opened from', async () => {
+  it('names the schema, in the file and inside it, after the slug of the title', async () => {
+    const sketch = 'Ship @Fleet\n    id*\n';
     open();
-    choose(file('booking.skiss', 'Ship @Fleet\n    id*\n'));
+    choose(file('Booking flow.skiss', sketch));
     await vi.waitFor(() => expect(editorText()).toContain('Ship'));
 
     query<HTMLButtonElement>(root, '#save-linkml').click();
 
     await vi.waitFor(() => expect(downloads.length).toBe(1));
-    expect(downloads[0]?.name).toBe('booking.linkml.yaml');
+    expect(downloads[0]?.name).toBe('booking-flow.linkml.yaml');
+    expect(await downloads[0]?.blob?.text()).toBe(linkmlText(sketch, 'booking-flow'));
   });
 
-  it('goes back to sketch.skiss when an example replaces the opened file', async () => {
+  it('names the downloads after the example when one replaces the opened file', async () => {
     open();
     choose(file('booking.skiss', 'Ship @Fleet\n    id*\n'));
     await vi.waitFor(() => expect(editorText()).toContain('Ship'));
 
-    const select = query<HTMLSelectElement>(root, '#example');
-    select.value = EXAMPLES[1]?.id ?? '';
-    select.dispatchEvent(new Event('change'));
+    chooseExample(root, EXAMPLES[1]?.id ?? '');
     query<HTMLButtonElement>(root, '#save-skiss').click();
 
     await vi.waitFor(() => expect(downloads.length).toBe(1));
-    expect(downloads[0]?.name).toBe('sketch.skiss');
+    expect(downloads[0]?.name).toBe('library.skiss');
+  });
+
+  it('names every download after the slug of the title', async () => {
+    open().setSketch(SKETCH);
+    typeTitle(root, 'Booking sketch');
+    await vi.waitFor(() => expect(root.querySelector('#diagram svg')).not.toBeNull());
+
+    query<HTMLButtonElement>(root, '#save-skiss').click();
+    query<HTMLButtonElement>(root, '#save-linkml').click();
+    query<HTMLButtonElement>(root, '#download-svg').click();
+
+    await vi.waitFor(() => expect(downloads.length).toBe(3));
+    expect(downloads.map((download) => download.name)).toEqual([
+      'booking-sketch.skiss',
+      'booking-sketch.linkml.yaml',
+      'booking-sketch.svg',
+    ]);
+    // The PNG is named by the same function, which `tests/files.test.ts`
+    // covers: rasterising one needs a canvas, which jsdom has not got.
+  });
+
+  it('asks before a file replaces a dirty sketch, and opens nothing when the visitor says no', async () => {
+    open().setSketch(SKETCH);
+    typeTitle(root, 'Droids');
+    answer = false;
+
+    choose(file('booking.skiss', 'Ship @Fleet\n    id*\n'));
+
+    // Nothing was read: the sketch, the title and the panel are as they were.
+    await vi.waitFor(() => expect(editorText()).toContain('Droid'));
+    expect(editorText()).not.toContain('Ship');
+    expect(titleOf(root)).toBe('Droids');
+    expect(query(root, '#notice').textContent).toBe('');
+  });
+
+  it('asks before a dropped file replaces a dirty sketch, and opens it when the visitor says yes', async () => {
+    open().setSketch(SKETCH);
+    answer = true;
+
+    drop(file('Booking flow.skiss', 'Ship @Fleet\n    id*\n'));
+
+    await vi.waitFor(() => expect(editorText()).toContain('Ship'));
+    expect(titleOf(root)).toBe('Booking flow');
+  });
+
+  it('replaces a sketch that is still the file it was opened from without asking', async () => {
+    open();
+    answer = false;
+    choose(file('booking.skiss', 'Ship @Fleet\n    id*\n'));
+    await vi.waitFor(() => expect(editorText()).toContain('Ship'));
+
+    // Nothing was edited since, so the second file replaces the first although
+    // the confirmation would have said no.
+    choose(file('people.txt', 'Droid @Catalog\n    serial*\n'));
+
+    await vi.waitFor(() => expect(editorText()).toContain('Droid'));
+    expect(titleOf(root)).toBe('people');
   });
 
   it('disables Save LinkML while the sketch has an error, and keeps Save .skiss', () => {
@@ -756,5 +898,162 @@ classes:
     page?.setSketch('Classes @Timetable\n    id*\n');
     expect(query<HTMLElement>(root, '.file-panel').hidden).toBe(true);
     expect(root.querySelector('#import-linkml')?.parentElement?.hidden).toBe(true);
+  });
+});
+
+/**
+ * The title in the header, the blank option the select falls back to, and the
+ * confirmation that stands between a sketch somebody has edited and whatever
+ * would replace it (issue #9).
+ */
+describe('the title, the blank example and the confirmation', () => {
+  let root: HTMLElement;
+  let page: Page | undefined;
+  let asked: string[];
+  let answer: boolean;
+
+  const EDITED = 'Droid @Catalog\n    serial*\n';
+
+  beforeEach(() => {
+    localStorage.clear();
+    window.location.hash = '';
+    asked = [];
+    answer = true;
+    root = document.createElement('div');
+    document.body.append(root);
+    page = mount(root, {
+      confirm: (question) => {
+        asked.push(question);
+        return answer;
+      },
+    });
+  });
+
+  afterEach(() => {
+    page?.destroy();
+    page = undefined;
+    root.remove();
+  });
+
+  function editorText(): string {
+    return query(root, '.cm-content').textContent ?? '';
+  }
+
+  it('says the title in the browser tab, and the page alone where there is none', () => {
+    typeTitle(root, 'Booking flow');
+    expect(document.title).toBe('Booking flow · Skiss playground');
+
+    typeTitle(root, '');
+    expect(document.title).toBe('Skiss playground');
+  });
+
+  it('takes a title of at most 120 characters', () => {
+    expect(query<HTMLInputElement>(root, '#title').maxLength).toBe(120);
+    expect(query<HTMLInputElement>(root, '#title').placeholder).toBe('Untitled sketch');
+
+    // A title pasted past what the input itself would have stopped.
+    typeTitle(root, 'x'.repeat(500));
+
+    expect(titleOf(root)).toHaveLength(120);
+  });
+
+  it('puts the select on the blank option as soon as the text is edited', () => {
+    expect(chosenExample(root)).toBe(EXAMPLES[0]?.id);
+
+    page?.setSketch(EDITED);
+
+    expect(chosenExample(root)).toBe('');
+    expect(texts(root, '#example option')[0]).toBe('Load an example…');
+  });
+
+  it('puts the select on the blank option as soon as the title is edited', () => {
+    typeTitle(root, 'My own catalogue');
+
+    expect(chosenExample(root)).toBe('');
+    // The text is untouched: it is the sketch that is no longer the example.
+    expect(editorText()).toContain('Character');
+  });
+
+  it('fills both the title and the text when an example is loaded', () => {
+    page?.setSketch(EDITED);
+    const library = EXAMPLES[1];
+
+    chooseExample(root, library?.id ?? '');
+
+    expect(titleOf(root)).toBe(library?.name);
+    expect(editorText()).toContain('Book');
+    expect(chosenExample(root)).toBe(library?.id);
+    expect(document.title).toBe(`${library?.name} · Skiss playground`);
+  });
+
+  it('replaces a clean sketch without asking', () => {
+    chooseExample(root, EXAMPLES[1]?.id ?? '');
+
+    expect(asked).toEqual([]);
+    expect(editorText()).toContain('Book');
+  });
+
+  it('asks before an example replaces a dirty sketch, and replaces it on yes', () => {
+    page?.setSketch(EDITED);
+    typeTitle(root, 'Droids');
+    answer = true;
+
+    chooseExample(root, EXAMPLES[1]?.id ?? '');
+
+    expect(asked).toEqual(['Replace "Droids"? Your current sketch will be gone from the editor.']);
+    expect(editorText()).toContain('Book');
+    expect(titleOf(root)).toBe(EXAMPLES[1]?.name);
+  });
+
+  it('leaves everything untouched when the visitor cancels', () => {
+    page?.setSketch(EDITED);
+    typeTitle(root, 'Droids');
+    answer = false;
+
+    chooseExample(root, EXAMPLES[1]?.id ?? '');
+
+    expect(asked.length).toBe(1);
+    expect(editorText()).toContain('Droid');
+    expect(editorText()).not.toContain('Book');
+    expect(titleOf(root)).toBe('Droids');
+    // And the select says what the sketch is: the visitor's own, not Library.
+    expect(chosenExample(root)).toBe('');
+  });
+
+  it('calls a sketch with no title by the name the input shows', () => {
+    page?.setSketch(EDITED);
+    typeTitle(root, '');
+    answer = false;
+
+    chooseExample(root, EXAMPLES[1]?.id ?? '');
+
+    expect(asked[0]).toContain('"Untitled sketch"');
+  });
+
+  it('asks again for a sketch edited after an example was loaded, and not before', () => {
+    chooseExample(root, EXAMPLES[1]?.id ?? '');
+    expect(asked).toEqual([]);
+
+    page?.setSketch(EDITED);
+    chooseExample(root, EXAMPLES[2]?.id ?? '');
+
+    expect(asked.length).toBe(1);
+  });
+
+  it('asks before an example replaces the draft of the last visit', () => {
+    page?.destroy();
+    localStorage.setItem('skiss-playground:draft', EDITED);
+    localStorage.setItem('skiss-playground:draft-title', 'Droids');
+    page = mount(root, {
+      confirm: (question) => {
+        asked.push(question);
+        return false;
+      },
+    });
+
+    chooseExample(root, EXAMPLES[1]?.id ?? '');
+
+    expect(asked.length).toBe(1);
+    expect(editorText()).toContain('Droid');
   });
 });

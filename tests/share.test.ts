@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_EXAMPLE } from '../src/examples';
-import { decodeSketch, encodedFromHash, encodeSketch, shareUrl } from '../src/share';
+import { decodeSketch, encodedFromHash, encodeSketch, shareUrl, titleFromHash } from '../src/share';
 
 /** Where the site is deployed, which is the link a visitor actually shares. */
 const DEPLOYED = 'https://erik-naslund.github.io/skiss-playground/';
@@ -39,7 +39,7 @@ describe('a sketch in the fragment', () => {
 
   it('writes the sketch into the fragment and reads it back from there', async () => {
     const encoded = await encodeSketch(DEFAULT_EXAMPLE.source);
-    const url = shareUrl(DEPLOYED, encoded);
+    const url = shareUrl(DEPLOYED, encoded, '');
 
     expect(url.startsWith(`${DEPLOYED}#s=`)).toBe(true);
     expect(encodedFromHash(new URL(url).hash)).toBe(encoded);
@@ -47,7 +47,7 @@ describe('a sketch in the fragment', () => {
 
   it('leaves the rest of the URL alone and replaces a fragment already there', async () => {
     const encoded = await encodeSketch('Planet\n    id*\n');
-    const url = shareUrl(`${DEPLOYED}?a=b#s=older`, encoded);
+    const url = shareUrl(`${DEPLOYED}?a=b#s=older`, encoded, '');
 
     expect(url).toBe(`${DEPLOYED}?a=b#s=${encoded}`);
   });
@@ -62,8 +62,51 @@ describe('a sketch in the fragment', () => {
   });
 
   it('puts the Star Wars example in a link of under 600 characters', async () => {
-    const url = shareUrl(DEPLOYED, await encodeSketch(DEFAULT_EXAMPLE.source));
+    const url = shareUrl(
+      DEPLOYED,
+      await encodeSketch(DEFAULT_EXAMPLE.source),
+      DEFAULT_EXAMPLE.name,
+    );
 
     expect(url.length).toBeLessThan(LINK_BUDGET);
+  });
+});
+
+describe('the title in the fragment', () => {
+  it('carries the title beside the sketch and reads both back', async () => {
+    const sketch = 'Booking @Reservations\n    reference*\n';
+    const encoded = await encodeSketch(sketch);
+
+    const url = shareUrl(DEPLOYED, encoded, 'Booking flow');
+
+    const { hash } = new URL(url);
+    expect(hash).toBe(`#s=${encoded}&t=Booking%20flow`);
+    expect(encodedFromHash(hash)).toBe(encoded);
+    expect(titleFromHash(hash)).toBe('Booking flow');
+    expect(await decodeSketch(encodedFromHash(hash) ?? '')).toBe(sketch);
+  });
+
+  it('carries a title with punctuation and an alphabet of its own through the link', async () => {
+    for (const title of ['Bokföring & fakturor', 'A/B: 100% ?', 'Fartyg — skärgård 🛳', 'a+b']) {
+      const url = shareUrl(DEPLOYED, await encodeSketch('Planet\n    id*\n'), title);
+
+      expect(titleFromHash(new URL(url).hash), title).toBe(title);
+    }
+  });
+
+  it('leaves the title out of the link where the sketch has none', async () => {
+    const encoded = await encodeSketch('Planet\n    id*\n');
+
+    const url = shareUrl(DEPLOYED, encoded, '');
+
+    expect(new URL(url).hash).toBe(`#s=${encoded}`);
+    expect(url).not.toContain('&t=');
+  });
+
+  it('opens a link written before the title existed with no title at all', () => {
+    // Every link the playground has handed out so far.
+    expect(titleFromHash('#s=AAAA')).toBe('');
+    expect(titleFromHash('')).toBe('');
+    expect(titleFromHash('#section-2')).toBe('');
   });
 });

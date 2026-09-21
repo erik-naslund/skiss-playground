@@ -12,6 +12,7 @@
 
 import { formatDropped, importLinkML } from '@eriknaslund/skiss';
 import { lineDiagnostics } from './preview';
+import { clampTitle, slugOf } from './title';
 
 /** A file whose text is a sketch as it stands. */
 export const SKETCH_EXTENSIONS = ['.skiss', '.txt'] as const;
@@ -27,9 +28,6 @@ export const REFUSED = `That is not a file this page can open: it reads ${ACCEPT
 
 /** What the name of a file says its text is. */
 export type FileKind = 'sketch' | 'linkml';
-
-/** The stem of the file names the page saves under when nothing was opened. */
-export const DEFAULT_STEM = 'sketch';
 
 /**
  * What the page will read a file called `name` as, by its extension and
@@ -62,31 +60,46 @@ function linkmlExtension(extension: string): boolean {
 }
 
 /**
- * What the downloads are named after: the opened file without its extension,
- * or `sketch` where nothing was opened. A `.linkml` left over from a schema the
+ * The title a file opened under: its name without the extension, as the
+ * visitor wrote it — `Booking flow.skiss` is the sketch *Booking flow*, which
+ * saves again as `booking-flow.skiss`. A `.linkml` left over from a schema the
  * page itself saved is taken off too, so a file opened and saved again is
- * `model.linkml.yaml` rather than `model.linkml.linkml.yaml`.
+ * `model.linkml.yaml` rather than `model.linkml.linkml.yaml`. A name that is
+ * nothing but an extension gives no title, and the downloads fall back to
+ * `sketch`.
  */
-export function stemOf(opened: string | undefined): string {
-  if (opened === undefined) {
-    return DEFAULT_STEM;
-  }
-  const extension = extensionOf(opened);
-  const withoutExtension = extension === '' ? opened : opened.slice(0, -extension.length);
+export function titleFromFilename(name: string): string {
+  const extension = extensionOf(name);
+  const withoutExtension = extension === '' ? name : name.slice(0, -extension.length);
   const stem = withoutExtension.toLowerCase().endsWith('.linkml')
     ? withoutExtension.slice(0, -'.linkml'.length)
     : withoutExtension;
-  return stem.trim() === '' ? DEFAULT_STEM : stem;
+  return clampTitle(stem.trim());
 }
 
-/** What *Save .skiss* calls the file. */
-export function skissFilename(opened?: string): string {
-  return `${stemOf(opened)}.skiss`;
+/**
+ * What the four downloads are called: the slug of the sketch's title, which is
+ * `sketch` where it has none. All four in one place, because they are one
+ * decision — a visitor who saves a sketch and its diagram should find four
+ * files with the same name beside each other.
+ */
+export function skissFilename(title: string): string {
+  return `${slugOf(title)}.skiss`;
 }
 
 /** What *Save LinkML* calls the file: the extension `skiss compile` writes. */
-export function linkmlFilename(opened?: string): string {
-  return `${stemOf(opened)}.linkml.yaml`;
+export function linkmlFilename(title: string): string {
+  return `${slugOf(title)}.linkml.yaml`;
+}
+
+/** What *Download SVG* calls the file. */
+export function svgFilename(title: string): string {
+  return `${slugOf(title)}.svg`;
+}
+
+/** What *Download PNG* calls the file. */
+export function pngFilename(title: string): string {
+  return `${slugOf(title)}.png`;
 }
 
 /** What a LinkML file becomes: a sketch where one could be read, and what to say about it. */

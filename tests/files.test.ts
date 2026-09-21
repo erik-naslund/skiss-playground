@@ -7,7 +7,10 @@ import {
   importSketch,
   linkmlFilename,
   looksLikeLinkML,
+  pngFilename,
   skissFilename,
+  svgFilename,
+  titleFromFilename,
 } from '../src/files';
 import { preview } from '../src/preview';
 
@@ -77,27 +80,46 @@ describe('what a file is read as', () => {
   });
 });
 
-describe('the names the two saves download under', () => {
-  it('names them after the sketch when nothing was opened', () => {
-    expect(skissFilename()).toBe('sketch.skiss');
-    expect(linkmlFilename()).toBe('sketch.linkml.yaml');
+describe('the names the four downloads land under', () => {
+  it('names all four after the slug of the title', () => {
+    expect(skissFilename('Booking sketch')).toBe('booking-sketch.skiss');
+    expect(linkmlFilename('Booking sketch')).toBe('booking-sketch.linkml.yaml');
+    expect(svgFilename('Booking sketch')).toBe('booking-sketch.svg');
+    expect(pngFilename('Booking sketch')).toBe('booking-sketch.png');
   });
 
-  it('names them after the file that was opened', () => {
-    expect(skissFilename('booking.skiss')).toBe('booking.skiss');
-    expect(linkmlFilename('booking.skiss')).toBe('booking.linkml.yaml');
-    expect(skissFilename('people.yaml')).toBe('people.skiss');
-    expect(skissFilename('notes.txt')).toBe('notes.skiss');
+  it('names them after the sketch where the title is empty', () => {
+    expect(skissFilename('')).toBe('sketch.skiss');
+    expect(linkmlFilename('')).toBe('sketch.linkml.yaml');
+    expect(svgFilename('')).toBe('sketch.svg');
+    expect(pngFilename('')).toBe('sketch.png');
   });
 
   it('does not stack a second .linkml on a schema the page itself saved', () => {
-    expect(linkmlFilename('people.linkml.yaml')).toBe('people.linkml.yaml');
-    expect(skissFilename('people.linkml.yaml')).toBe('people.skiss');
+    // The title of a `people.linkml.yaml` that was opened, saved again.
+    expect(linkmlFilename(titleFromFilename('people.linkml.yaml'))).toBe('people.linkml.yaml');
+    expect(skissFilename(titleFromFilename('people.linkml.yaml'))).toBe('people.skiss');
+  });
+});
+
+describe('the title a file is opened under', () => {
+  it('is the name of the file without its extension, as it was written', () => {
+    expect(titleFromFilename('Booking flow.skiss')).toBe('Booking flow');
+    expect(titleFromFilename('people.yaml')).toBe('people');
+    expect(titleFromFilename('notes.txt')).toBe('notes');
+    // And that title names the file the sketch saves as again.
+    expect(skissFilename(titleFromFilename('Booking flow.skiss'))).toBe('booking-flow.skiss');
   });
 
-  it('falls back to the sketch where the name is nothing but an extension', () => {
-    expect(skissFilename('.skiss')).toBe('sketch.skiss');
-    expect(linkmlFilename('   ')).toBe('sketch.linkml.yaml');
+  it('takes off a .linkml the page itself put there', () => {
+    expect(titleFromFilename('people.linkml.yaml')).toBe('people');
+    expect(titleFromFilename('Booking flow.LINKML.yaml')).toBe('Booking flow');
+  });
+
+  it('is no title at all where the name is nothing but an extension', () => {
+    expect(titleFromFilename('.skiss')).toBe('');
+    expect(titleFromFilename('   ')).toBe('');
+    expect(skissFilename(titleFromFilename('.skiss'))).toBe('sketch.skiss');
   });
 });
 

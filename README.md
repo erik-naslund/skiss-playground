@@ -11,12 +11,13 @@ Try [Skiss](https://github.com/erik-naslund/skiss) in the browser: write a sketc
 - **An editor on the left.** CodeMirror 6, with the sketch coloured as you write it: class names, `@` systems, primitives and enum values carry a colour, and everything you wrote yourself — field names, the words after `#`, the types the compiler does not know — reads as text. Light and dark follow your own setting.
 - **The diagram on the right.** Mermaid draws it in your browser, a moment after you stop typing. A half-typed line never blanks it: the last diagram that drew stays until the next one does. Drag to pan, wheel or pinch to zoom, **Fit** to go back.
 - **The compiler's diagnostics where you are looking.** A red or yellow bar in the gutter beside every line that has one — the message is on the bar's tooltip — and the same diagnostics as a list under the editor, errors first. The `?` doubts of the sketch are listed under *Open questions*.
-- **Four examples** in the header, to start from rather than an empty page.
-- **A link you can send.** *Share* puts the whole sketch in the link, copies it and writes it into the address bar. Whoever opens it sees what you saw.
+- **A title of your own.** *Title* in the header names the sketch: it is what the browser tab says, what the four downloads are called and what the LinkML schema is named. Leave it empty and everything falls back to `sketch`.
+- **Four examples** in the header, to start from rather than an empty page. The select goes back to *Load an example…* the moment you edit the sketch or its title, so the header stops claiming you are still reading *Star Wars catalogue*. An example, a file or a dropped file that would replace a sketch you have edited asks first.
+- **A link you can send.** *Share* puts the whole sketch and its title in the link, copies it and writes it into the address bar. Whoever opens it sees what you saw.
 - **The sketch out of the page.** *Copy Mermaid* and *Copy LinkML* put the text the compiler generates on your clipboard; *Download SVG* and *Download PNG* save the diagram as a file. The PNG is transparent, at twice the size the diagram is drawn at, so it stands up where it is pasted.
 - **Your own files.** *Open* reads a `.skiss` or `.txt` file into the editor, and a `.yaml`, `.yml` or `.json` LinkML schema back into a sketch — the same projection `skiss import` does, with a line above the editor saying what a sketch is too small to carry. Drop a file on the editor instead, if that is quicker. *Save .skiss* writes the sketch out again, *Save LinkML* the compiled schema. A file is read by your own browser and goes nowhere.
 - **Your colours.** *Highlight colours* in the header offers the three the Obsidian plugin does: **Calm**, which colours what says what a thing is; **Vivid**, which colours the names and the marks between them too; and **Off**, which leaves the sketch as plain text and the diagnostics in the gutter. The choice is remembered between visits.
-- **Your draft, still there.** What you last wrote is kept in your browser and restored the next time you open the page — unless you opened a link, which wins.
+- **Your draft, still there.** What you last wrote — the sketch and its title — is kept in your browser and restored the next time you open the page, unless you opened a link, which wins.
 
 Editor and diagram sit side by side on a wide screen and stack on a narrow one; the divider between them is the editor's own right edge, which you can drag.
 
@@ -37,8 +38,10 @@ Everything else is CodeMirror's default keymap.
 | | |
 | --- | --- |
 | *Open*, or a file dropped on the editor | `.skiss`, `.txt` — the text of the file becomes the sketch. `.yaml`, `.yml`, `.json` — a LinkML schema, projected into a sketch by the package's own `importLinkML`. Anything else is refused by name. |
-| *Save .skiss* | The sketch as it stands, as `sketch.skiss` — or under the name of the file you opened. |
-| *Save LinkML* | The compiled schema as `sketch.linkml.yaml`, the text `skiss compile` writes. Disabled while the sketch has an error, because half a schema is not a file anyone wants. |
+| *Save .skiss* | The sketch as it stands, named after the title: *Booking flow* saves as `booking-flow.skiss`. |
+| *Save LinkML* | The compiled schema as `booking-flow.linkml.yaml`, the text `skiss compile` writes, with the schema named `booking-flow` inside it too. Disabled while the sketch has an error, because half a schema is not a file anyone wants. |
+
+Opening a file sets the title from its name — `Booking flow.skiss` is the sketch *Booking flow* — and every download is named after the title from then on: a lowercased slug of it, with spaces and punctuation as single hyphens and accents folded (`Bokföring` is `bokforing`). A sketch with no title downloads as `sketch.skiss`, `sketch.linkml.yaml`, `sketch.svg` and `sketch.png`.
 
 A sketch is a smaller language than LinkML, so a schema that carries more than it can — a `pattern`, a `required`, a `mixins` — comes in without them, and the line above the editor says exactly what was left behind, as `skiss import` says it on the command line. It stays until your next edit. The file itself is never touched: what you opened is still on your disk as it was.
 
@@ -48,7 +51,7 @@ A file you open is read in the page by the browser itself, and a file you save i
 
 ### What a share link holds
 
-The link is the sketch. *Share* compresses the text with the browser's own `CompressionStream('deflate-raw')`, encodes the bytes as base64url and puts them in the URL's fragment — the part after the `#` — as `#s=<base64url>`. The Star Wars example comes to a link of about 260 characters. Opening a link decodes it back into the editor, and a fragment that does not decode is ignored with a short notice rather than an empty page. What the link does not carry is your choice of highlight colours: a link carries the sketch, not a preference.
+The link is the sketch and its title. *Share* compresses the text with the browser's own `CompressionStream('deflate-raw')`, encodes the bytes as base64url and puts them in the URL's fragment — the part after the `#` — as `#s=<base64url>`, with the title beside it as `&t=<title>`, URL-encoded and left out where there is none. The Star Wars example comes to a link of about 260 characters. Opening a link decodes it back into the editor, title and all; a link written before titles existed opens with an empty one, and a fragment that does not decode is ignored with a short notice rather than an empty page. What the link does not carry is your choice of highlight colours: a link carries the sketch, not a preference.
 
 A fragment is the one part of a URL a browser never sends to the server, so a sketch in a link reaches whoever you send the link to and nobody else. Nothing is uploaded, and there is no short-link service in the middle.
 

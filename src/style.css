@@ -141,7 +141,8 @@ h1 {
 }
 
 select,
-button {
+button,
+input[type="text"] {
   padding: 0.3rem 0.6rem;
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -149,6 +150,18 @@ button {
   color: inherit;
   font: inherit;
   font-size: 0.875rem;
+}
+
+/* The title of the sketch. It takes the room it can and gives it up on a
+   narrow screen rather than pushing the selects beside it off the header. */
+#title {
+  flex: 1 1 16rem;
+  min-width: 8rem;
+  max-width: 24rem;
+}
+
+#title::placeholder {
+  color: var(--muted);
 }
 
 button {
@@ -164,7 +177,8 @@ button:disabled {
 }
 
 select:focus-visible,
-button:focus-visible {
+button:focus-visible,
+input[type="text"]:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }

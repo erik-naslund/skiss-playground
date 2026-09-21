@@ -8,12 +8,9 @@
  *
  * Everything that does not need a canvas — the markup, the size, the factor —
  * is a function here, so what the PNG is twice the size of is a plain test and
- * only the drawing itself needs a browser.
+ * only the drawing itself needs a browser. What the two files are called is
+ * `files.ts`, with the names of the other two downloads.
  */
-
-/** What the SVG and the PNG are called when they land in the downloads folder. */
-export const SVG_FILENAME = 'sketch.svg';
-export const PNG_FILENAME = 'sketch.png';
 
 /**
  * How many image pixels the PNG carries per diagram pixel. Fixed rather than
