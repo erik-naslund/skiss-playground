@@ -1057,3 +1057,28 @@ describe('the title, the blank example and the confirmation', () => {
     expect(editorText()).toContain('Droid');
   });
 });
+
+describe('the tagline', () => {
+  let root: HTMLElement;
+  let page: Page | undefined;
+
+  beforeEach(() => {
+    localStorage.clear();
+    window.location.hash = '';
+    root = document.createElement('div');
+    document.body.append(root);
+  });
+
+  afterEach(() => {
+    page?.destroy();
+    root.remove();
+  });
+
+  it('links the language, for a visitor who lands here first', () => {
+    page = mount(root);
+    const link = query<HTMLAnchorElement>(root, '.tagline a');
+    expect(link.getAttribute('href')).toBe('https://github.com/erik-naslund/skiss');
+    expect(link.textContent).toBe('Skiss');
+    expect(query(root, '.tagline').textContent).toContain('Nothing leaves your browser.');
+  });
+});

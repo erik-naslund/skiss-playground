@@ -58,6 +58,9 @@ const QUESTIONS_HEADING = 'Open questions';
 const DIAGNOSTICS_HEADING = 'Diagnostics';
 const COMPILE_FAILED = 'The sketch could not be compiled';
 
+/** Where the language is explained: its README, specification and roadmap. */
+export const LANGUAGE_URL = 'https://github.com/erik-naslund/skiss';
+
 /** How long a confirmation stays on screen. */
 const NOTICE_MS = 2000;
 
@@ -118,9 +121,19 @@ export function mount(root: HTMLElement, options: PageOptions = {}): Page {
   version.textContent = `@eriknaslund/skiss ${VERSION}`;
   banner.append(' ', version);
 
+  // The tagline links the language, for a visitor who lands here first and
+  // wants to know what a sketch is before writing one.
   const tagline = document.createElement('p');
   tagline.className = 'tagline';
-  tagline.textContent = 'Write a sketch, watch the diagram. Nothing leaves your browser.';
+  const languageLink = document.createElement('a');
+  languageLink.href = LANGUAGE_URL;
+  languageLink.textContent = 'Skiss';
+  languageLink.rel = 'noopener';
+  tagline.append(
+    'Write a sketch in ',
+    languageLink,
+    ', watch the diagram. Nothing leaves your browser.',
+  );
 
   /**
    * The title, which is the visitor's name for the sketch and nothing the
