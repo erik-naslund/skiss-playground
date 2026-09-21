@@ -2,6 +2,7 @@ import { parse, resolve, serialize, toLinkML, toMermaid } from '@eriknaslund/ski
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_EXAMPLE } from '../src/examples';
 import { linkmlText, mermaidText, SCHEMA_NAME } from '../src/exports';
+import { slugOf } from '../src/title';
 
 describe('what the two copy buttons put on the clipboard', () => {
   it('copies the Mermaid `skiss diagram` writes for the same sketch', () => {
@@ -31,6 +32,26 @@ describe('what the two copy buttons put on the clipboard', () => {
     expect(copied).toContain('imports:\n  - linkml:types');
     expect(copied).toContain('  Character:');
     expect(copied).toContain('        identifier: true');
+  });
+
+  it('compiles the schema under the slug of the title, and `sketch` where there is none', () => {
+    const named = linkmlText(DEFAULT_EXAMPLE.source, slugOf('Booking flow'));
+
+    // The slug is what the compile options carry; what LinkML makes of it —
+    // the `name` it is written under and the `id` derived from that — is the
+    // package's own (AGENTS.md §2).
+    expect(named).toBe(
+      serialize(
+        toLinkML(resolve(parse(DEFAULT_EXAMPLE.source)), { schemaName: 'booking-flow' }),
+        'yaml',
+      ),
+    );
+    expect(named).toContain('booking_flow');
+    expect(named).not.toContain('name: sketch');
+
+    expect(linkmlText(DEFAULT_EXAMPLE.source, slugOf(''))).toContain(`name: ${SCHEMA_NAME}`);
+    // What the page asks for when the sketch has no title at all.
+    expect(linkmlText(DEFAULT_EXAMPLE.source)).toContain('name: sketch');
   });
 
   it('copies both without throwing for a sketch the compiler cannot read', () => {

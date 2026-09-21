@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { readDraft, readHighlight, saveDraft, saveHighlight } from '../src/storage';
+import {
+  readDraft,
+  readDraftTitle,
+  readHighlight,
+  saveDraft,
+  saveDraftTitle,
+  saveHighlight,
+} from '../src/storage';
 
 /** A `Storage` holding whatever a test puts in it, and nothing else. */
 function fakeStorage(entries: Record<string, string> = {}): Storage {
@@ -46,6 +53,30 @@ describe('the draft between visits', () => {
     expect(readDraft(undefined)).toBeUndefined();
     expect(() => saveDraft(blockedStorage(), 'Planet\n')).not.toThrow();
     expect(() => saveDraft(undefined, 'Planet\n')).not.toThrow();
+  });
+
+  it('keeps the title of the draft beside its text', () => {
+    const storage = fakeStorage();
+
+    saveDraft(storage, 'Booking @Reservations\n    id*\n');
+    saveDraftTitle(storage, 'Booking flow');
+
+    expect(readDraft(storage)).toBe('Booking @Reservations\n    id*\n');
+    expect(readDraftTitle(storage)).toBe('Booking flow');
+  });
+
+  it('restores a draft written before the title existed, with no title', () => {
+    const storage = fakeStorage({ 'skiss-playground:draft': 'Planet\n    id*\n' });
+
+    expect(readDraft(storage)).toBe('Planet\n    id*\n');
+    expect(readDraftTitle(storage)).toBe('');
+  });
+
+  it('has no title, and throws nothing, where storage is blocked', () => {
+    expect(readDraftTitle(blockedStorage())).toBe('');
+    expect(readDraftTitle(undefined)).toBe('');
+    expect(() => saveDraftTitle(blockedStorage(), 'Booking')).not.toThrow();
+    expect(() => saveDraftTitle(undefined, 'Booking')).not.toThrow();
   });
 });
 

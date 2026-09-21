@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A title for the sketch.** *Title* in the header names it: the browser tab
+  follows it, a slug of it names all four downloads — `booking-flow.skiss`,
+  `booking-flow.linkml.yaml`, `booking-flow.svg`, `booking-flow.png` — and the
+  LinkML schema is compiled under the same slug. Opening a file takes the title
+  from its name, and a share link carries it as `&t=<title>` beside the sketch.
+  A sketch with no title is `sketch`, as before. The example select gets a blank
+  first option, *Load an example…*, which it falls back to as soon as the sketch
+  or its title is edited, and an example, an opened file or a dropped file that
+  would replace an edited sketch asks first.
+
 - **Files in and out of the page.** *Open* — and a file dropped on the editor —
   reads a `.skiss` or `.txt` file as a sketch, and a `.yaml`, `.yml` or `.json`
   LinkML schema through the package's `importLinkML`, with the line

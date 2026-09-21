@@ -135,3 +135,13 @@ export const EXAMPLES: readonly Example[] = [CATALOGUE, LIBRARY, SHOP, QUESTIONS
 
 /** What the page opens with on a fresh visit. */
 export const DEFAULT_EXAMPLE: Example = CATALOGUE;
+
+/**
+ * The example a sketch is exactly — both its title and its text — or
+ * `undefined` where it is the visitor's own. It is what the header's select
+ * shows: an example while the sketch still is that example, and the blank
+ * option as soon as a keystroke has made it something else.
+ */
+export function exampleOf(title: string, text: string): Example | undefined {
+  return EXAMPLES.find((example) => example.name === title && example.source === text);
+}

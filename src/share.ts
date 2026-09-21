@@ -9,6 +9,10 @@
  * a fragment would have to carry in base64.
  *
  * A function from text to text either way, so the round trip is a plain test.
+ *
+ * The title rides along beside the sketch, URL-encoded rather than compressed:
+ * it is one line, and a link a visitor reads before they open it is worth more
+ * than the handful of characters packing it would save.
  */
 
 /**
@@ -18,8 +22,9 @@
  */
 type Bytes = Uint8Array<ArrayBuffer>;
 
-/** The fragment's key: `#s=<base64url>`. */
+/** The fragment's keys: `#s=<base64url>&t=<title>`. */
 export const FRAGMENT_KEY = 's';
+export const TITLE_KEY = 't';
 
 /**
  * The sketch as the fragment holds it: deflated, then base64url, which is the
@@ -59,18 +64,34 @@ export async function decodeSketch(encoded: string): Promise<string | undefined>
  * mistaken for a sketch.
  */
 export function encodedFromHash(hash: string): string | undefined {
-  const query = hash.startsWith('#') ? hash.slice(1) : hash;
-  return new URLSearchParams(query).get(FRAGMENT_KEY) ?? undefined;
+  return paramsOf(hash).get(FRAGMENT_KEY) ?? undefined;
 }
 
 /**
- * `href` with the sketch in its fragment, which is both what Share copies and
- * what the address bar is replaced with. Anything else the URL carries is left
+ * The title a link carried, or `''` where it carried none — which is every
+ * link written before the title existed, and every link to a sketch that has
+ * no title.
+ */
+export function titleFromHash(hash: string): string {
+  return paramsOf(hash).get(TITLE_KEY) ?? '';
+}
+
+function paramsOf(hash: string): URLSearchParams {
+  const query = hash.startsWith('#') ? hash.slice(1) : hash;
+  return new URLSearchParams(query);
+}
+
+/**
+ * `href` with the sketch and its title in the fragment, which is both what
+ * Share copies and what the address bar is replaced with. An empty title is
+ * left out rather than carried as an empty key, so the link of an untitled
+ * sketch is the link it always was. Anything else the URL carries is left
  * alone; only the fragment is ours.
  */
-export function shareUrl(href: string, encoded: string): string {
+export function shareUrl(href: string, encoded: string, title: string): string {
   const url = new URL(href);
-  url.hash = `${FRAGMENT_KEY}=${encoded}`;
+  const named = title === '' ? '' : `&${TITLE_KEY}=${encodeURIComponent(title)}`;
+  url.hash = `${FRAGMENT_KEY}=${encoded}${named}`;
   return url.toString();
 }
 

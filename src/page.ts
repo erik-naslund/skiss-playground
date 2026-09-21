@@ -6,16 +6,17 @@
  *
  * This file is wiring and nothing else. What a sketch means is `preview.ts`,
  * what it looks like is `editor.ts` and `highlight.ts`, what it draws is
- * `diagram.ts`, what a link holds is `share.ts`, what a file holds is
- * `files.ts`, what leaves as a file is `image.ts` and `download.ts`, and what
- * survives a reload is `storage.ts`.
+ * `diagram.ts`, what a link holds is `share.ts`, what a file holds and what
+ * every download is called is `files.ts`, what leaves as a file is `image.ts`
+ * and `download.ts`, what survives a reload is `storage.ts`, and what the
+ * title means is `title.ts` and `sketch.ts`.
  */
 
 import { VERSION } from '@eriknaslund/skiss';
 import { createDiagram } from './diagram';
 import { copyText, download } from './download';
 import { createEditor } from './editor';
-import { DEFAULT_EXAMPLE, EXAMPLES } from './examples';
+import { DEFAULT_EXAMPLE, EXAMPLES, exampleOf } from './examples';
 import { linkmlText, mermaidText } from './exports';
 import {
   ACCEPT,
@@ -23,10 +24,13 @@ import {
   importSketch,
   linkmlFilename,
   looksLikeLinkML,
+  pngFilename,
   REFUSED,
   skissFilename,
+  svgFilename,
+  titleFromFilename,
 } from './files';
-import { noDiagram, PNG_FILENAME, pngBlob, SVG_FILENAME, svgBlob } from './image';
+import { noDiagram, pngBlob, svgBlob } from './image';
 import {
   applyHighlight,
   HIGHLIGHT_OPTIONS,
@@ -36,15 +40,19 @@ import {
 } from './palette';
 import { panZoom } from './panzoom';
 import { type LineDiagnostic, preview } from './preview';
-import { decodeSketch, encodedFromHash, encodeSketch, shareUrl } from './share';
+import { decodeSketch, encodedFromHash, encodeSketch, shareUrl, titleFromHash } from './share';
+import { isDirty, replaceQuestion, type Sketch } from './sketch';
 import {
   browserStorage,
   DRAFT_DEBOUNCE_MS,
   readDraft,
+  readDraftTitle,
   readHighlight,
   saveDraft,
+  saveDraftTitle,
   saveHighlight,
 } from './storage';
+import { clampTitle, documentTitle, MAX_TITLE_LENGTH, slugOf, UNTITLED } from './title';
 
 const QUESTIONS_HEADING = 'Open questions';
 const DIAGNOSTICS_HEADING = 'Diagnostics';
@@ -62,6 +70,9 @@ const BAD_FRAGMENT = 'That link carried no sketch this page could read';
 const HAS_ERROR = 'The sketch has an error to put right first';
 const READ_FAILED = 'That file could not be read';
 
+/** The select's first option: no example, and what a sketch of one's own sits on. */
+const NO_EXAMPLE = 'Load an example…';
+
 /** What the notice above the editor says about a file, and about pasted text. */
 const IMPORTED = 'Imported as a sketch';
 const NOT_IMPORTED = 'No LinkML schema could be read out of that';
@@ -69,6 +80,16 @@ const PASTE_OFFER = 'This looks like LinkML. Import it as a sketch?';
 
 /** What marks the editor pane while a file is being dragged over it. */
 const DROPPING_CLASS = 'dropping';
+
+/** What the page needs from outside itself, which is one question. */
+export interface PageOptions {
+  /**
+   * What asks before a dirty sketch is replaced. `window.confirm` in the page;
+   * a test answers it without a human. It is the only dialog the page has —
+   * no library, and nothing that has to be styled.
+   */
+  confirm?: (question: string) => boolean;
+}
 
 /** The page as `main.ts` mounts it, and as a test writes a sketch into. */
 export interface Page {
@@ -83,32 +104,51 @@ export interface Page {
   destroy(): void;
 }
 
-export function mount(root: HTMLElement): Page {
+export function mount(root: HTMLElement, options: PageOptions = {}): Page {
   root.replaceChildren();
 
   const storage = browserStorage();
+  const ask = options.confirm ?? ((question: string) => window.confirm(question));
 
-  const title = document.createElement('h1');
-  title.textContent = 'Skiss playground';
+  const banner = document.createElement('h1');
+  banner.textContent = 'Skiss playground';
 
   const version = document.createElement('span');
   version.className = 'version';
   version.textContent = `@eriknaslund/skiss ${VERSION}`;
-  title.append(' ', version);
+  banner.append(' ', version);
 
   const tagline = document.createElement('p');
   tagline.className = 'tagline';
   tagline.textContent = 'Write a sketch, watch the diagram. Nothing leaves your browser.';
 
+  /**
+   * The title, which is the visitor's name for the sketch and nothing the
+   * language knows about (issue #9). It is what the tab says, what every
+   * download is called and what the schema is named.
+   */
+  const titleField = document.createElement('input');
+  titleField.id = 'title';
+  titleField.type = 'text';
+  titleField.maxLength = MAX_TITLE_LENGTH;
+  titleField.placeholder = UNTITLED;
+  // A sketch's name is not an address or a name the browser has seen before.
+  titleField.autocomplete = 'off';
+
   const examples = document.createElement('select');
   examples.id = 'example';
+  // The state the select is in for as long as the sketch is the visitor's own
+  // rather than one of the four: first, so it is what an empty page shows.
+  const noExample = document.createElement('option');
+  noExample.value = '';
+  noExample.textContent = NO_EXAMPLE;
+  examples.append(noExample);
   for (const example of EXAMPLES) {
     const option = document.createElement('option');
     option.value = example.id;
     option.textContent = example.name;
     examples.append(option);
   }
-  examples.value = DEFAULT_EXAMPLE.id;
 
   const highlight = document.createElement('select');
   highlight.id = 'highlight';
@@ -125,6 +165,8 @@ export function mount(root: HTMLElement): Page {
   const chooser = document.createElement('div');
   chooser.className = 'chooser';
   chooser.append(
+    fieldLabel(titleField, 'Title'),
+    titleField,
     fieldLabel(examples, 'Example'),
     examples,
     fieldLabel(highlight, 'Highlight colours'),
@@ -179,7 +221,7 @@ export function mount(root: HTMLElement): Page {
   );
 
   const header = document.createElement('header');
-  header.append(title, tagline, chooser, actions);
+  header.append(banner, tagline, chooser, actions);
 
   const editorHost = document.createElement('div');
   editorHost.id = 'editor';
@@ -255,11 +297,11 @@ export function mount(root: HTMLElement): Page {
   let draftTimer: ReturnType<typeof setTimeout> | undefined;
 
   /**
-   * The name of the file the sketch came out of, which the two saves are named
-   * after. Undefined until something is opened, which is when they are
-   * `sketch.skiss` and `sketch.linkml.yaml`.
+   * The sketch as it was last loaded from an example, a file or a link. What
+   * is on screen differing from it is what *dirty* means, and what a
+   * confirmation stands in front of.
    */
-  let opened: string | undefined;
+  let loaded: Sketch = { title: '', text: '' };
 
   /** Whether the change the editor is about to report is the page's own. */
   let ownEdit = false;
@@ -286,13 +328,62 @@ export function mount(root: HTMLElement): Page {
   }
 
   /**
-   * The draft, a while after the last keystroke. Debounced because a keystroke
-   * is cheap and a write to `localStorage` is not; the palette is written as
-   * it is chosen, which happens once in a while rather than per character.
+   * The draft — the sketch and its title — a while after the last keystroke.
+   * Debounced because a keystroke is cheap and a write to `localStorage` is
+   * not; the palette is written as it is chosen, which happens once in a while
+   * rather than per character.
    */
-  function keepDraft(text: string): void {
+  function keepDraft(): void {
     clearTimeout(draftTimer);
-    draftTimer = setTimeout(() => saveDraft(storage, text), DRAFT_DEBOUNCE_MS);
+    draftTimer = setTimeout(() => {
+      saveDraft(storage, editor.text());
+      saveDraftTitle(storage, titleField.value);
+    }, DRAFT_DEBOUNCE_MS);
+  }
+
+  /** The sketch as it stands: what the header says it is called and what the editor holds. */
+  function current(): Sketch {
+    return { title: titleField.value, text: editor.text() };
+  }
+
+  /**
+   * The title, in the header and in the browser's own tab. Everything that
+   * follows from it — the tab, the select's state — follows from here, so
+   * there is one way for the title to change.
+   */
+  function setTitle(text: string): void {
+    titleField.value = clampTitle(text);
+    document.title = documentTitle(titleField.value);
+    showExample();
+  }
+
+  /**
+   * The select follows the sketch rather than the last thing that was chosen:
+   * the example while the sketch still is exactly that example, title and all,
+   * and the blank option from the first keystroke that makes it something
+   * else.
+   */
+  function showExample(): void {
+    examples.value = exampleOf(titleField.value, editor.text())?.id ?? '';
+  }
+
+  /**
+   * Whether something may replace what is in the editor. A sketch that still
+   * is what was loaded goes without a word; the visitor's own work is replaced
+   * only if they say so, because the editor is the only place it exists.
+   */
+  function mayReplace(): boolean {
+    return !isDirty(current(), loaded) || ask(replaceQuestion(titleField.value));
+  }
+
+  /** A sketch the page itself loaded: it is on screen, and it is what dirty is measured against. */
+  function loadSketch(sketch: Sketch): void {
+    setTitle(sketch.title);
+    editor.setText(sketch.text);
+    loaded = { title: titleField.value, text: sketch.text };
+    // A fresh sketch is a fresh diagram: the pan and the zoom of the last one
+    // would leave it off screen.
+    view.fit();
   }
 
   /**
@@ -386,6 +477,11 @@ export function mount(root: HTMLElement): Page {
       tell(REFUSED, [], false);
       return;
     }
+    // Asked before the file is read, and after it is clear the page can read
+    // it at all: a refusal replaces nothing, so it is nothing to ask about.
+    if (!mayReplace()) {
+      return;
+    }
     let text: string;
     try {
       text = await file.text();
@@ -394,9 +490,11 @@ export function mount(root: HTMLElement): Page {
       return;
     }
     if (kind === 'sketch') {
-      opened = file.name;
       sayNothingAboutFiles();
       fromFile(text);
+      // The file's own name is the title, which is what it saves as again.
+      setTitle(titleFromFilename(file.name));
+      loaded = current();
       say(`${file.name} opened`);
       return;
     }
@@ -415,11 +513,14 @@ export function mount(root: HTMLElement): Page {
       tell(NOT_IMPORTED, imported.report, false);
       return;
     }
-    if (name !== undefined) {
-      opened = name;
-    }
     tell(IMPORTED, imported.report, false);
     fromFile(imported.source);
+    if (name !== undefined) {
+      setTitle(titleFromFilename(name));
+      loaded = current();
+    }
+    // Text the visitor pasted and imported is their own work, not something
+    // loaded: it keeps whatever title it had, and stays dirty.
   }
 
   /**
@@ -446,7 +547,11 @@ export function mount(root: HTMLElement): Page {
    */
   async function share(): Promise<void> {
     try {
-      const url = shareUrl(window.location.href, await encodeSketch(editor.text()));
+      const url = shareUrl(
+        window.location.href,
+        await encodeSketch(editor.text()),
+        titleField.value,
+      );
       window.history.replaceState(null, '', url);
       await copyText(url);
       say(LINK_COPIED);
@@ -489,19 +594,20 @@ export function mount(root: HTMLElement): Page {
 
   const fragment = encodedFromHash(window.location.hash);
   /**
-   * What the editor opens with. A link wins over everything, so a visit that
+   * What the page opens with. A link wins over everything, so a visit that
    * carries one does not read the draft at all; the editor starts empty and
    * the sketch arrives a moment later, rather than showing a sketch that is
    * about to be replaced.
    */
-  const opening = fragment === undefined ? (readDraft(storage) ?? DEFAULT_EXAMPLE.source) : '';
+  const opening: Sketch = fragment === undefined ? withoutALink() : { title: '', text: '' };
 
   const editor = createEditor(editorHost, {
-    doc: opening,
+    doc: opening.text,
     highlighting: highlights(colours),
     onChange: (text) => {
       update(text, false);
-      keepDraft(text);
+      keepDraft();
+      showExample();
       if (ownEdit) {
         // A sketch the page itself wrote: what it has to say about it is
         // already above the editor.
@@ -520,18 +626,20 @@ export function mount(root: HTMLElement): Page {
 
   examples.addEventListener('change', () => {
     const chosen = EXAMPLES.find((example) => example.id === examples.value);
-    if (chosen === undefined) {
+    // The blank option loads nothing, and a sketch that was not replaced is
+    // still what it was: either way the select goes back to saying so.
+    if (chosen === undefined || !mayReplace()) {
+      showExample();
       return;
     }
     // An example replaces the draft, through the same change listener every
     // other edit goes through.
-    editor.setText(chosen.source);
-    // And it is not the file that was opened, so the saves go back to being
-    // named after the sketch.
-    opened = undefined;
-    // A fresh sketch is a fresh diagram: the pan and the zoom of the last one
-    // would leave it off screen.
-    view.fit();
+    loadSketch({ title: chosen.name, text: chosen.source });
+  });
+
+  titleField.addEventListener('input', () => {
+    setTitle(titleField.value);
+    keepDraft();
   });
 
   highlight.addEventListener('change', () => {
@@ -563,10 +671,13 @@ export function mount(root: HTMLElement): Page {
   importButton.addEventListener('click', () => importText(editor.text(), undefined));
 
   saveSkiss.addEventListener('click', () => {
-    saveText(() => editor.text(), skissFilename(opened));
+    saveText(() => editor.text(), skissFilename(titleField.value));
   });
   saveLinkml.addEventListener('click', () => {
-    saveText(() => linkmlText(editor.text()), linkmlFilename(opened));
+    saveText(
+      () => linkmlText(editor.text(), slugOf(titleField.value)),
+      linkmlFilename(titleField.value),
+    );
   });
 
   fit.addEventListener('click', () => view.fit());
@@ -577,13 +688,13 @@ export function mount(root: HTMLElement): Page {
   );
   copyLinkml.addEventListener(
     'click',
-    () => void copy(() => linkmlText(editor.text()), LINKML_COPIED),
+    () => void copy(() => linkmlText(editor.text(), slugOf(titleField.value)), LINKML_COPIED),
   );
   downloadSvg.addEventListener('click', () => {
-    void saveFile(async () => svgBlob(drawnSvg()), SVG_FILENAME);
+    void saveFile(async () => svgBlob(drawnSvg()), svgFilename(titleField.value));
   });
   downloadPng.addEventListener('click', () => {
-    void saveFile(() => pngBlob(drawnSvg()), PNG_FILENAME);
+    void saveFile(() => pngBlob(drawnSvg()), pngFilename(titleField.value));
   });
 
   /**
@@ -650,7 +761,9 @@ export function mount(root: HTMLElement): Page {
   };
   window.addEventListener('keydown', onKeyDown);
 
-  update(opening, true);
+  setTitle(opening.title);
+  loaded = baselineOf(opening);
+  update(opening.text, true);
 
   /**
    * The sketch a link carried, put into the editor once it has inflated. A
@@ -661,11 +774,38 @@ export function mount(root: HTMLElement): Page {
   async function readFragment(encoded: string): Promise<void> {
     const text = await decodeSketch(encoded);
     if (text === undefined) {
-      editor.setText(readDraft(storage) ?? DEFAULT_EXAMPLE.source);
+      const fallback = withoutALink();
+      loadSketch(fallback);
+      // A draft that came back because the link could not be read is the
+      // visitor's own, exactly as it is on a visit that carried no link.
+      loaded = baselineOf(fallback);
       warn(BAD_FRAGMENT);
       return;
     }
-    editor.setText(text);
+    // A link carries its title beside the sketch, and one written before the
+    // title existed carries none: that sketch opens untitled.
+    loadSketch({ title: clampTitle(titleFromHash(window.location.hash)), text });
+  }
+
+  /**
+   * What a visit with no link to read opens with: the draft of the last visit,
+   * title and all, or the first example on a first visit.
+   */
+  function withoutALink(): Sketch {
+    const text = readDraft(storage);
+    return text === undefined
+      ? { title: DEFAULT_EXAMPLE.name, text: DEFAULT_EXAMPLE.source }
+      : { title: clampTitle(readDraftTitle(storage)), text };
+  }
+
+  /**
+   * What *dirty* is measured against for a sketch the page did not load itself.
+   * A draft restored from the last visit is exactly one of the examples or it
+   * is the visitor's own work, and the second is worth asking about before
+   * something replaces it: no visit remembers what the one before it loaded.
+   */
+  function baselineOf(sketch: Sketch): Sketch {
+    return exampleOf(sketch.title, sketch.text) === undefined ? { title: '', text: '' } : sketch;
   }
 
   return {
@@ -673,6 +813,7 @@ export function mount(root: HTMLElement): Page {
     ready: fragment === undefined ? Promise.resolve() : readFragment(fragment),
     destroy: () => {
       window.removeEventListener('keydown', onKeyDown);
+      document.title = documentTitle('');
       clearTimeout(noticeTimer);
       clearTimeout(draftTimer);
       applyHighlight(document.body, 'calm');
