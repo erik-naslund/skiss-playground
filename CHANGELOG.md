@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-09-21
+
+The first release: a sketch you can write, watch, share, save and open, without installing anything.
+
 ### Added
 
 - **A title for the sketch.** *Title* in the header names it: the browser tab
@@ -62,3 +66,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sketch, and shows the Mermaid text and the diagnostics that
   `@eriknaslund/skiss` 0.5.0 produced for it, updated as the sketch is
   edited.
+
+[Unreleased]: https://github.com/erik-naslund/skiss-playground/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/erik-naslund/skiss-playground/releases/tag/v0.1.0
