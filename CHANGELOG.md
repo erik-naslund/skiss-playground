@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `@eriknaslund/skiss` 0.6.1: a name outside ASCII, such as `förnamn`, gets a message that says names are ASCII and points at the character that is not, and one bad class name is one diagnostic rather than one per field under it.
 - The tagline links the language: a visitor who lands here first can read what a sketch is before writing one.
 
 ## [0.1.0] - 2026-09-21
