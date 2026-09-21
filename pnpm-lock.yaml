@@ -18,8 +18,8 @@ importers:
         specifier: ^6.43.12
         version: 6.43.12
       '@eriknaslund/skiss':
-        specifier: 0.6.0
-        version: 0.6.0
+        specifier: 0.6.1
+        version: 0.6.1
       mermaid:
         specifier: ^12.0.0
         version: 12.0.0
@@ -180,8 +180,8 @@ packages:
     resolution: {integrity: sha512-bPlN9S9O1A0euCpEWE4qnvB5YDuyYVsUTrxSgmAM1Is0j4tICHoVyOVAXfWMP/kS9ZrjvyIXWV2PmomiAXXqOw==}
     engines: {node: '>=20.19.0'}
 
-  '@eriknaslund/skiss@0.6.0':
-    resolution: {integrity: sha512-qOqIih9nGrT9/8IhEc2D06ENk/Bkp3rCcXrB+hJA27zch/wgpiLD74U7F48DaQbxU66QKth2OuJsHAdF+5p6Vg==}
+  '@eriknaslund/skiss@0.6.1':
+    resolution: {integrity: sha512-3REg32JNKwTknv0Ji2La3d5gKAShq3h73E1gHxRHSI+RB2gVBb9TwydN4thNT0eo1LZVy4e7e+PwKs6fMCSx2A==}
     engines: {node: '>=20'}
     hasBin: true
 
@@ -1349,7 +1349,7 @@ snapshots:
 
   '@csstools/css-tokenizer@4.0.1': {}
 
-  '@eriknaslund/skiss@0.6.0':
+  '@eriknaslund/skiss@0.6.1':
     dependencies:
       yaml: 2.9.1
 
