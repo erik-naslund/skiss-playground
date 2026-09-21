@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The tagline links the language: a visitor who lands here first can read what a sketch is before writing one.
+
 ## [0.1.0] - 2026-09-21
 
 The first release: a sketch you can write, watch, share, save and open, without installing anything.
