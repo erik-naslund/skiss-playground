@@ -7,8 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-14
+
+The diagram says no more than the sketch.
+
 ### Changed
 
+- `@eriknaslund/skiss` 0.7.0: a `[]` relation draws without multiplicity labels. `players: Player[]` is an arrow like any other; the box still shows `Player[]`, so the plural is visible without the diagram claiming a one-to-many the sketch never stated.
 - `@eriknaslund/skiss` 0.6.1: a name outside ASCII, such as `förnamn`, gets a message that says names are ASCII and points at the character that is not, and one bad class name is one diagnostic rather than one per field under it.
 - The tagline links the language: a visitor who lands here first can read what a sketch is before writing one.
 
@@ -72,5 +77,6 @@ The first release: a sketch you can write, watch, share, save and open, without 
   `@eriknaslund/skiss` 0.5.0 produced for it, updated as the sketch is
   edited.
 
-[Unreleased]: https://github.com/erik-naslund/skiss-playground/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/erik-naslund/skiss-playground/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/erik-naslund/skiss-playground/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/erik-naslund/skiss-playground/releases/tag/v0.1.0
