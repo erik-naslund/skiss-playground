@@ -200,3 +200,7 @@ Same model as the `skiss` and `obsidian-skiss` repositories:
 4. **The tech lead plans; workers execute.** Workers get one
    self-contained issue, never ask the product owner directly, and never
    spawn workers. They report through their PR.
+5. **The tech lead tags releases.** After merging a release PR, the tech
+   lead pushes the tag and confirms the Release run
+   ([skiss ADR-0011](https://github.com/erik-naslund/skiss/blob/main/docs/adr/0011-tech-lead-tags-releases.md)).
+   Workers never tag; holding a release means not merging the release PR.
