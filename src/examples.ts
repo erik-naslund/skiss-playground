@@ -2,7 +2,10 @@
  * The sketches the header's `<select>` offers. Four, because four is what it
  * takes to show the notation: a catalogue of systems and references, an enum
  * and a `~` relation, inheritance, and a sketch that is mostly still
- * questions. The first one loads on a fresh visit.
+ * questions. The first one loads on a fresh visit, and carries the two things
+ * a description can be beyond one line — the `#` block that describes the
+ * whole sketch and a description continued on an indented `#` line — so a
+ * visitor sees them without going looking (issue #21).
  *
  * Every example compiles without an error diagnostic; `tests/examples.test.ts`
  * is what keeps that true.
@@ -22,7 +25,9 @@ export interface Example {
 const CATALOGUE: Example = {
   id: 'catalogue',
   name: 'Star Wars catalogue',
-  source: `Character @Catalog     # Someone in the films
+  source: `# The people of the films and the worlds they come from.
+
+Character @Catalog     # Someone in the films
     id*
     name
     homeworld: Planet
@@ -31,7 +36,8 @@ const CATALOGUE: Example = {
 Planet @Catalog
     id*
     name
-    climate: arid|temperate|frozen
+    climate: arid|temperate|frozen   # How the archive files a world:
+        # arid, temperate or frozen, and nothing in between.
 
 Jedi < Character
     rank: padawan|knight|master
