@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-20
+
+The words of the sketch, copied as a page.
+
 ### Added
 
 - **The words of the sketch as Markdown.** *Copy glossary* puts what `skiss glossary` writes on the clipboard — a section per class, its fields in a table, the `#` descriptions as the definitions — and *Copy terms* what `skiss glossary --classes` writes, the terms alone as a `| Term | Definition |` table. The title is the heading, as it was typed rather than as a slug: a glossary is read by a person. Both are disabled while the sketch has an error, as the other two copies are, and neither carries the `?` doubts, which is what the diagram beside them does too.
@@ -85,6 +89,7 @@ The first release: a sketch you can write, watch, share, save and open, without 
   `@eriknaslund/skiss` 0.5.0 produced for it, updated as the sketch is
   edited.
 
-[Unreleased]: https://github.com/erik-naslund/skiss-playground/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/erik-naslund/skiss-playground/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/erik-naslund/skiss-playground/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/erik-naslund/skiss-playground/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/erik-naslund/skiss-playground/releases/tag/v0.1.0
