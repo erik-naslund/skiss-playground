@@ -28,6 +28,13 @@ describe('the examples', () => {
     });
   }
 
+  it('describes the whole sketch, and continues one description, in the first one', () => {
+    // The two things a `#` description can be beyond one line, in the example a
+    // fresh visit opens on (issue #21).
+    expect(DEFAULT_EXAMPLE.source.startsWith('# ')).toBe(true);
+    expect(DEFAULT_EXAMPLE.source).toContain('# How the archive files a world:\n        # arid,');
+  });
+
   it('shows an enum and a `~` relation in the library', () => {
     const library = EXAMPLES.find((example) => example.id === 'library');
 

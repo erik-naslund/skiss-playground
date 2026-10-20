@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The words of the sketch as Markdown.** *Copy glossary* puts what `skiss glossary` writes on the clipboard — a section per class, its fields in a table, the `#` descriptions as the definitions — and *Copy terms* what `skiss glossary --classes` writes, the terms alone as a `| Term | Definition |` table. The title is the heading, as it was typed rather than as a slug: a glossary is read by a person. Both are disabled while the sketch has an error, as the other two copies are, and neither carries the `?` doubts, which is what the diagram beside them does too.
+
+### Changed
+
+- `@eriknaslund/skiss` 0.8.0: the glossary, and the two places a `#` description can now be more than one line. The *Star Wars catalogue* example opens with a `#` block describing the whole sketch and continues one field's description on an indented `#` line, so a visitor sees both without going looking.
+
 ## [0.2.0] - 2026-10-14
 
 The diagram says no more than the sketch.

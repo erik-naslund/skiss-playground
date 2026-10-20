@@ -17,7 +17,7 @@ import { createDiagram } from './diagram';
 import { copyText, download } from './download';
 import { createEditor } from './editor';
 import { DEFAULT_EXAMPLE, EXAMPLES, exampleOf } from './examples';
-import { linkmlText, mermaidText } from './exports';
+import { glossaryText, linkmlText, mermaidText, termsText } from './exports';
 import {
   ACCEPT,
   fileKind,
@@ -67,6 +67,8 @@ const NOTICE_MS = 2000;
 const LINK_COPIED = 'Link copied';
 const MERMAID_COPIED = 'Mermaid copied';
 const LINKML_COPIED = 'LinkML copied';
+const GLOSSARY_COPIED = 'Glossary copied';
+const TERMS_COPIED = 'Terms copied';
 const COPY_FAILED = 'Nothing was copied';
 const DOWNLOAD_FAILED = 'Nothing was downloaded';
 const BAD_FRAGMENT = 'That link carried no sketch this page could read';
@@ -192,6 +194,8 @@ export function mount(root: HTMLElement, options: PageOptions = {}): Page {
   const shareButton = action('share', 'Share');
   const copyMermaid = action('copy-mermaid', 'Copy Mermaid');
   const copyLinkml = action('copy-linkml', 'Copy LinkML');
+  const copyGlossary = action('copy-glossary', 'Copy glossary');
+  const copyTerms = action('copy-terms', 'Copy terms');
   const downloadSvg = action('download-svg', 'Download SVG');
   const downloadPng = action('download-png', 'Download PNG');
 
@@ -227,6 +231,8 @@ export function mount(root: HTMLElement, options: PageOptions = {}): Page {
     shareButton,
     copyMermaid,
     copyLinkml,
+    copyGlossary,
+    copyTerms,
     downloadSvg,
     downloadPng,
     fileInput,
@@ -429,12 +435,13 @@ export function mount(root: HTMLElement, options: PageOptions = {}): Page {
   }
 
   /**
-   * The three ways the compiled schema and diagram leave the page. *Save
-   * .skiss* is not one of them: the sketch itself is the visitor's own text,
-   * error or no error, and a file of it is how they come back to put it right.
+   * The five ways the compiled schema, diagram and glossary leave the page.
+   * *Save .skiss* is not one of them: the sketch itself is the visitor's own
+   * text, error or no error, and a file of it is how they come back to put it
+   * right.
    */
   function allowExports(allowed: boolean): void {
-    for (const button of [copyMermaid, copyLinkml, saveLinkml]) {
+    for (const button of [copyMermaid, copyLinkml, copyGlossary, copyTerms, saveLinkml]) {
       button.disabled = !allowed;
       if (allowed) {
         button.removeAttribute('title');
@@ -702,6 +709,16 @@ export function mount(root: HTMLElement, options: PageOptions = {}): Page {
   copyLinkml.addEventListener(
     'click',
     () => void copy(() => linkmlText(editor.text(), slugOf(titleField.value)), LINKML_COPIED),
+  );
+  // The glossary is headed by the title as typed rather than its slug: it is
+  // Markdown somebody reads, not a file name.
+  copyGlossary.addEventListener(
+    'click',
+    () => void copy(() => glossaryText(editor.text(), titleField.value), GLOSSARY_COPIED),
+  );
+  copyTerms.addEventListener(
+    'click',
+    () => void copy(() => termsText(editor.text(), titleField.value), TERMS_COPIED),
   );
   downloadSvg.addEventListener('click', () => {
     void saveFile(async () => svgBlob(drawnSvg()), svgFilename(titleField.value));

@@ -1,8 +1,9 @@
 /**
- * The two texts a sketch can be copied as. Both go through the package's own
- * `compile`, with the same options its CLI passes, so what the clipboard gets
- * is character for character what `skiss diagram` and `skiss compile` write
- * for the same sketch. No generation of any kind happens here (AGENTS.md §2).
+ * The four texts a sketch can be copied as. All of them go through the
+ * package's own `compile`, with the same options its CLI passes, so what the
+ * clipboard gets is character for character what `skiss diagram`,
+ * `skiss compile`, `skiss glossary` and `skiss glossary --classes` write for
+ * the same sketch. No generation of any kind happens here (AGENTS.md §2).
  */
 
 import { compile } from '@eriknaslund/skiss';
@@ -29,4 +30,40 @@ export function mermaidText(source: string): string {
  */
 export function linkmlText(source: string, schemaName: string = SCHEMA_NAME): string {
   return compile(source, { target: 'linkml', schemaName, format: 'yaml' }).output;
+}
+
+/**
+ * The heading a glossary carries where the sketch has no title. It is the
+ * package's own default for a glossary with no name to take one from, which is
+ * what the CLI writes when it reads standard input.
+ */
+export const GLOSSARY_NAME = 'Glossary';
+
+/**
+ * The `#` heading of the glossary: the title as the visitor typed it, not its
+ * slug — a glossary is read by a person and names the domain, where a schema
+ * and a file name are read by a machine (issue #21).
+ */
+function headingOf(title: string): string {
+  return title.trim() === '' ? GLOSSARY_NAME : title;
+}
+
+/**
+ * The Markdown glossary, as `skiss glossary` writes it: a section per class,
+ * its fields in a table, the `#` descriptions as the definitions.
+ *
+ * The `?` doubts are left out, as they are in the Mermaid: `--notes` is what
+ * adds them to either, and the page passes it to neither, so what the glossary
+ * says about a sketch is what the diagram beside it shows.
+ */
+export function glossaryText(source: string, title = ''): string {
+  return compile(source, { target: 'glossary', name: headingOf(title) }).output;
+}
+
+/**
+ * The terms alone, as `skiss glossary --classes` writes them: one row per
+ * class, no fields.
+ */
+export function termsText(source: string, title = ''): string {
+  return compile(source, { target: 'glossary', name: headingOf(title), classes: true }).output;
 }

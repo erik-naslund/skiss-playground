@@ -3,7 +3,7 @@
 import { VERSION } from '@eriknaslund/skiss';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { EXAMPLES } from '../src/examples';
-import { linkmlText, mermaidText } from '../src/exports';
+import { glossaryText, linkmlText, mermaidText, termsText } from '../src/exports';
 import { ACCEPT, importSketch } from '../src/files';
 import { mount, type Page } from '../src/page';
 import { VIVID_BODY_CLASS } from '../src/palette';
@@ -371,18 +371,43 @@ describe('sharing, copying and downloading', () => {
     expect(copied()).toBe(linkmlText(sketch));
   });
 
-  it('disables both copies while the sketch has an error, and says why on the button', () => {
+  it('copies the glossary and the terms of the sketch on screen, headed by the title', async () => {
+    const sketch =
+      'Character @Catalog     # Someone in the films\n    id*\n    homeworld: Planet\n\nPlanet @Catalog\n    id*\n';
+    open().setSketch(sketch);
+    typeTitle(root, 'Booking flow');
+
+    await press('#copy-glossary');
+    expect(query(root, '#notice').textContent).toBe('Glossary copied');
+    // The title as typed, not its slug: the heading is Markdown a person reads.
+    expect(copied()).toBe(glossaryText(sketch, 'Booking flow'));
+    expect(copied()).toContain('# Booking flow');
+
+    await press('#copy-terms');
+    expect(query(root, '#notice').textContent).toBe('Terms copied');
+    expect(copied()).toBe(termsText(sketch, 'Booking flow'));
+    expect(copied()).toContain('| Term | Definition |');
+
+    typeTitle(root, '');
+    await press('#copy-glossary');
+    expect(copied()).toBe(glossaryText(sketch));
+  });
+
+  it('disables all four copies while the sketch has an error, and says why on the button', () => {
     open().setSketch('Character\n  homeworld: Planet\n  ???\n');
 
-    for (const id of ['#copy-mermaid', '#copy-linkml']) {
+    for (const id of ['#copy-mermaid', '#copy-linkml', '#copy-glossary', '#copy-terms']) {
       const button = query<HTMLButtonElement>(root, id);
       expect(button.disabled, id).toBe(true);
       expect(button.title, id).not.toBe('');
     }
 
     page?.setSketch('Character\n    name\n');
-    expect(query<HTMLButtonElement>(root, '#copy-mermaid').disabled).toBe(false);
-    expect(query<HTMLButtonElement>(root, '#copy-linkml').hasAttribute('title')).toBe(false);
+    for (const id of ['#copy-mermaid', '#copy-linkml', '#copy-glossary', '#copy-terms']) {
+      const button = query<HTMLButtonElement>(root, id);
+      expect(button.disabled, id).toBe(false);
+      expect(button.hasAttribute('title'), id).toBe(false);
+    }
   });
 
   it('names the diagram after the title: the first example downloads as its own slug', async () => {
